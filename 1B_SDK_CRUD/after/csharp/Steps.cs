@@ -1,0 +1,209 @@
+// Lab 1B: SDK Basics / CRUD - Consolidated Steps
+
+using System.Text.Json;
+using Azure.Identity;
+using Microsoft.Azure.Cosmos;
+
+namespace CosmosLabs;
+
+public static class Steps
+{
+    public static CosmosClient? _client = null;
+    public static Database? _database = null;
+    public static Container? _container = null;
+    public static string? _endpoint = null;
+    public static string? _itemId = null;
+
+    #region Init
+    public static async Task InitAsync()
+    {
+        Console.WriteLine("\n=== Step 0: Setup (Connection) ===\n");
+
+        var cosmosEndpoint = Environment.GetEnvironmentVariable("COSMOS_ENDPOINT");
+        if (string.IsNullOrEmpty(cosmosEndpoint))
+            throw new InvalidOperationException("COSMOS_ENDPOINT environment variable is required.");
+
+        _endpoint = cosmosEndpoint;
+
+        var credential = new DefaultAzureCredential();
+        var accountName = Environment.GetEnvironmentVariable("COSMOS_ACCOUNT_NAME") ?? "unknown";
+        var dbName = "WorkshopData";
+        var containerName = "Catalog";
+
+        _client = new CosmosClient(cosmosEndpoint, credential, new CosmosClientOptions
+        {
+            SerializerOptions = new CosmosSerializationOptions { PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase }
+        });
+        _database = _client.GetDatabase(dbName);
+        _container = _database.GetContainer(containerName);
+
+        Console.WriteLine($"  endpoint: {_endpoint}");
+        Console.WriteLine($"  account: {accountName}");
+        Console.WriteLine($"  database: {dbName}");
+        Console.WriteLine($"  container: {containerName}");
+        Console.WriteLine($"  connected: {_endpoint}{dbName}/{containerName}\n");
+    }
+    #endregion
+
+    #region Step 1
+    public static async Task Step1Async()
+    {
+        if (_container is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
+
+        Console.WriteLine("\n=== Step 1: Create an Item ===\n");
+
+        var itemId = Guid.NewGuid().ToString();
+        Console.WriteLine($"  creating item with id: {itemId}");
+
+        var item = new CatalogItem
+        {
+            Id = itemId,
+            Name = "Store Item #1",
+            Category = "workshop",
+            PartitionKey = "workshop",
+            Data = new CatalogItemData
+            {
+                Price = 42.0m,
+                Tags = new[] { "cosmos", "demo" }
+            }
+        };
+
+        try
+        {
+            var response = await _container.CreateItemAsync<CatalogItem>(
+                item,
+                new PartitionKey("workshop"));
+
+            var requestCharge = response.RequestCharge;
+            Console.WriteLine($"  created item: {response.Resource.Id}");
+            Console.WriteLine($"  RU charged: {requestCharge}\n");
+
+            _itemId = itemId;
+        }
+        catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            Console.WriteLine($"  item {itemId} already exists in container\n");
+            _itemId = itemId;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  error creating item: {ex.Message}\n");
+        }
+    }
+    #endregion
+
+    #region Step 2
+    public static async Task Step2Async()
+    {
+        if (_container is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
+        if (string.IsNullOrEmpty(_itemId)) throw new InvalidOperationException("Item not created yet. Run Step 1 first.");
+
+        Console.WriteLine("\n=== Step 2: Read an Item ===");
+        Console.WriteLine("*** STUDENT EXERCISE - Complete this step ***\n");
+
+        var itemId = _itemId!;
+        Console.WriteLine($"  reading item with id: {itemId}");
+
+        try
+        {
+            var readResponse = await _container.ReadItemAsync<CatalogItem>(
+                itemId,
+                new PartitionKey("workshop"));
+
+            var json = JsonSerializer.Serialize(readResponse.Resource, new JsonSerializerOptions { WriteIndented = true });
+            Console.WriteLine($"  item: {json}");
+            Console.WriteLine($"  RU charged: {readResponse.RequestCharge}\n");
+        }
+        catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            Console.WriteLine($"  item {itemId} not found\n");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  error reading item: {ex.Message}\n");
+        }
+    }
+    #endregion
+
+    #region Step 3
+    public static async Task Step3Async()
+    {
+        if (_container is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
+        if (string.IsNullOrEmpty(_itemId)) throw new InvalidOperationException("Item not created yet. Run Step 1 first.");
+
+        Console.WriteLine("\n=== Step 3: Upsert the Item ===\n");
+
+        var itemId = _itemId!;
+        Console.WriteLine("  updating price: 42.0 -> 55.0");
+
+        var item = new CatalogItem
+        {
+            Id = itemId,
+            Name = "Cosmic Item #1",
+            Category = "workshop",
+            PartitionKey = "workshop",
+            Data = new CatalogItemData
+            {
+                Price = 55.0m,
+                Tags = new[] { "cosmos", "demo" }
+            }
+        };
+
+        try
+        {
+            var upsertResponse = await _container.UpsertItemAsync<CatalogItem>(
+                item,
+                new PartitionKey("workshop"));
+
+            Console.WriteLine($"  upserted item: {upsertResponse.Resource.Id}");
+            Console.WriteLine($"  new price: {upsertResponse.Resource.Data.Price}");
+            Console.WriteLine($"  RU charged: {upsertResponse.RequestCharge}\n");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  error upserting item: {ex.Message}\n");
+        }
+    }
+    #endregion
+
+    #region Step 4
+    public static async Task Step4Async()
+    {
+        if (_container is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
+        if (string.IsNullOrEmpty(_itemId)) throw new InvalidOperationException("Item not created yet. Run Step 1 first.");
+
+        Console.WriteLine("\n=== Step 4: Delete the Item ===\n");
+
+        var itemId = _itemId!;
+        Console.WriteLine($"  deleting item: {itemId}\n");
+
+        try
+        {
+            var deleteResponse = await _container.DeleteItemAsync<CatalogItem>(
+                itemId,
+                new PartitionKey("workshop"));
+
+            Console.WriteLine($"  deleted item: {itemId}");
+            Console.WriteLine($"  status: {deleteResponse.StatusCode}");
+            Console.WriteLine($"  RU charged: {deleteResponse.RequestCharge}\n");
+
+            Console.WriteLine("=== Lab Complete ===");
+            Console.WriteLine("You have completed the CRUD operations exercise in C#. You:");
+            Console.WriteLine("- Connected to Cosmos DB using DefaultAzureCredential");
+            Console.WriteLine("- Created an item with CreateItemAsync()");
+            Console.WriteLine("- Read an item with ReadItemAsync()");
+            Console.WriteLine("- Updated an item with UpsertItemAsync()");
+            Console.WriteLine("- Deleted an item with DeleteItemAsync()");
+            Console.WriteLine("- Inspected RU charges from each operation response");
+        }
+        catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            Console.WriteLine($"  item {itemId} not found (may have been deleted)\n");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  error deleting item: {ex.Message}\n");
+        }
+    }
+    #endregion
+}
