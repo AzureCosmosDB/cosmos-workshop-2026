@@ -1,0 +1,1 @@
+# cosmos-workshop-2026-labs
