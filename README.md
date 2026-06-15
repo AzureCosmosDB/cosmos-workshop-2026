@@ -11,3 +11,5 @@ Each lab contains the same folder structure for both languages and before and af
 │   ├── csharp/
 │   └── python/
 ```
+
+Lab 4B is online in Fabric so has no local code component.
