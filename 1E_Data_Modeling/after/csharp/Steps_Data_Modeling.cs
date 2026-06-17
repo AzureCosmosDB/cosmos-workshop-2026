@@ -6,7 +6,7 @@ using System.Text.Json;
 using Azure.Identity;
 using Microsoft.Azure.Cosmos;
 
-namespace CosmosLabs;
+namespace Lab1E;
 
 public class Steps_Data_Modeling
 {
@@ -35,7 +35,7 @@ public class Steps_Data_Modeling
     #endregion
 
     #region Init
-    public async Task InitAsync()
+    public async Task Init()
     {
         Console.WriteLine("\n=== Step 0: Setup (Connection to provisioned-throughput account) ===\n");
 
@@ -81,7 +81,7 @@ public class Steps_Data_Modeling
         return order;
     }
 
-    private static async Task SeedOrdersAsync(
+    private static async Task SeedOrders(
         Container container,
         IReadOnlyList<Dictionary<string, object>> orders,
         Func<Dictionary<string, object>, PartitionKey> pkSelector)
@@ -128,7 +128,7 @@ public class Steps_Data_Modeling
     #endregion
 
     #region Step 1
-    public async Task Step1Async()
+    public async Task Step1()
     {
         if (DB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
@@ -145,7 +145,7 @@ public class Steps_Data_Modeling
         Console.WriteLine($"Using {Concurrency} concurrent writers to drive sustained RU on the hot partition...");
 
         var hotPk = new PartitionKey("CUST_001");
-        await SeedOrdersAsync(DB.GetContainer(HotContainerName), orders, _ => hotPk);
+        await SeedOrders(DB.GetContainer(HotContainerName), orders, _ => hotPk);
 
         Console.WriteLine("Note: All orders use the same partition key 'CUST_001' - this creates a hot partition.");
         Console.WriteLine("Check Azure Portal > Cosmos DB > Metrics > 'Normalized RU Consumption (Max)' split by PartitionKeyRangeId");
@@ -155,7 +155,7 @@ public class Steps_Data_Modeling
     #endregion
 
     #region Step 2
-    public async Task Step2Async()
+    public async Task Step2()
     {
         if (DB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
@@ -181,7 +181,7 @@ public class Steps_Data_Modeling
     #endregion
 
     #region Step 3
-    public async Task Step3Async()
+    public async Task Step3()
     {
         if (DB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
@@ -199,7 +199,7 @@ public class Steps_Data_Modeling
         Console.WriteLine($"Re-seeding {orders.Count} orders into '{CompositeContainerName}' (composite '/partitionKey')");
         Console.WriteLine($"Using {Concurrency} concurrent writers...");
 
-        await SeedOrdersAsync(
+        await SeedOrders(
             DB.GetContainer(CompositeContainerName),
             orders,
             order => new PartitionKey((string)order["partitionKey"]));
@@ -210,7 +210,7 @@ public class Steps_Data_Modeling
     #endregion
 
     #region Step 4
-    public async Task Step4Async()
+    public async Task Step4()
     {
         if (DB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
@@ -260,7 +260,7 @@ public class Steps_Data_Modeling
     #endregion
 
     #region Step 5
-    public async Task Step5Async()
+    public async Task Step5()
     {
         if (DB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
@@ -312,7 +312,7 @@ public class Steps_Data_Modeling
         Console.WriteLine($"  Waiting {waitSeconds}s for the short-lived item to expire...");
         await Task.Delay(TimeSpan.FromSeconds(waitSeconds));
 
-        async Task<bool> ExistsAsync(string id)
+        async Task<bool> Exists(string id)
         {
             try
             {
@@ -325,9 +325,9 @@ public class Steps_Data_Modeling
             }
         }
 
-        bool shortAlive = await ExistsAsync("short-lived");
-        bool neverAlive = await ExistsAsync("never-expires");
-        bool defaultAlive = await ExistsAsync("default-ttl");
+        bool shortAlive = await Exists("short-lived");
+        bool neverAlive = await Exists("never-expires");
+        bool defaultAlive = await Exists("default-ttl");
 
         Console.WriteLine("\n  Read-back after wait:");
         Console.WriteLine($"    short-lived   (ttl=5)         exists? {shortAlive}    expected: False");
@@ -344,7 +344,7 @@ public class Steps_Data_Modeling
     #endregion
 
     #region Step 6
-    public async Task Step6Async()
+    public async Task Step6()
     {
         if (DB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 

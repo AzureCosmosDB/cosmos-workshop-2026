@@ -7,7 +7,7 @@ using Azure.Identity;
 using Microsoft.Azure.Cosmos;
 using OpenAI.Chat;
 
-namespace CosmosLabs;
+namespace Lab2F;
 
 public class Steps_Evaluation
 {
@@ -37,7 +37,7 @@ public class Steps_Evaluation
     #endregion
 
     #region Init
-    public async Task InitAsync()
+    public async Task Init()
     {
         Console.WriteLine("\n=== Step 0: Setup (Connection) ===\n");
 
@@ -259,7 +259,7 @@ public class Steps_Evaluation
     #endregion
 
     #region Step 5
-    public async Task Step5Async()
+    public async Task Step5()
     {
         Console.WriteLine("\n=== Step 5: Summarize Results ===");
 

@@ -3,7 +3,7 @@
 using Azure.Identity;
 using Microsoft.Azure.Cosmos;
 
-namespace CosmosLabs.C1;
+namespace Lab1D1;
 
 public class Steps_Query_Language
 {

@@ -4,18 +4,18 @@ using System.Text.Json;
 using Azure.Identity;
 using Microsoft.Azure.Cosmos;
 
-namespace CosmosLabs;
+namespace Lab1B;
 
-public static class Steps_SDK_CRUD
+public class Steps_SDK_CRUD
 {
-    public static CosmosClient? _client = null;
-    public static Database? _database = null;
-    public static Container? _container = null;
-    public static string? _endpoint = null;
-    public static string? _itemId = null;
+    public CosmosClient? _client = null;
+    public Database? _database = null;
+    public Container? _container = null;
+    public string? _endpoint = null;
+    public string? _itemId = null;
 
     #region Init
-    public static async Task InitAsync()
+    public async Task Init()
     {
         Console.WriteLine("\n=== Step 0: Setup (Connection) ===\n");
 
@@ -46,7 +46,7 @@ public static class Steps_SDK_CRUD
     #endregion
 
     #region Step 1
-    public static async Task Step1Async()
+    public async Task Step1()
     {
         if (_container is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
@@ -91,7 +91,7 @@ public static class Steps_SDK_CRUD
     #endregion
 
     #region Step 2
-    public static async Task Step2Async()
+    public async Task Step2()
     {
         if (_container is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
         if (string.IsNullOrEmpty(_itemId)) throw new InvalidOperationException("Item not created yet. Run Step 1 first.");
@@ -123,7 +123,7 @@ public static class Steps_SDK_CRUD
     #endregion
 
     #region Step 3
-    public static async Task Step3Async()
+    public async Task Step3()
     {
         if (_container is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
         if (string.IsNullOrEmpty(_itemId)) throw new InvalidOperationException("Item not created yet. Run Step 1 first.");
@@ -163,7 +163,7 @@ public static class Steps_SDK_CRUD
     #endregion
 
     #region Step 4
-    public static async Task Step4Async()
+    public async Task Step4()
     {
         if (_container is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
         if (string.IsNullOrEmpty(_itemId)) throw new InvalidOperationException("Item not created yet. Run Step 1 first.");

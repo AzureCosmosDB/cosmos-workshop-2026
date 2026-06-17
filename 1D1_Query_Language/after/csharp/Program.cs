@@ -1,6 +1,6 @@
 // Lab 1D1: Query Language
 
-using CosmosLabs.C1;
+using Lab1D1;
 
 var steps = new Steps_Query_Language();
 

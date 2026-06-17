@@ -4,7 +4,7 @@
 using Azure.Identity;
 using Microsoft.Azure.Cosmos;
 
-namespace CosmosLabs;
+namespace Lab1D2;
 
 public class Steps_Indexing
 {
@@ -30,7 +30,7 @@ public class Steps_Indexing
     #endregion
 
     #region Init
-    public async Task Step0Async()
+    public async Task Step0()
     {
         Console.WriteLine("\n=== Step 0: Init (Connection) ===\n");
 
@@ -46,7 +46,7 @@ public class Steps_Indexing
     #endregion
 
     #region Step 1
-    public async Task Step1Async()
+    public async Task Step1()
     {
         if (DB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
@@ -68,7 +68,7 @@ public class Steps_Indexing
     #endregion
 
     #region Step 2
-    public async Task Step2Async()
+    public async Task Step2()
     {
         if (DB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
@@ -106,7 +106,7 @@ public class Steps_Indexing
     #endregion
 
     #region Step 3
-    public async Task Step3Async()
+    public async Task Step3()
     {
         if (DB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
@@ -118,12 +118,12 @@ public class Steps_Indexing
         var itemDefault = new { id = $"blob_test_{Guid.NewGuid():N}", partitionKey = "idx", largeBlob };
         var itemCustom = new { id = $"blob_test_{Guid.NewGuid():N}", partitionKey = "idx", largeBlob };
 
-        await CompareRuAsync(itemDefault, itemCustom);
+        await CompareRu(itemDefault, itemCustom);
     }
     #endregion
 
     #region Step 4
-    public async Task Step4Async()
+    public async Task Step4()
     {
         if (DB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
@@ -136,12 +136,12 @@ public class Steps_Indexing
         var itemDefault = new { id = $"meta_test_{Guid.NewGuid():N}", partitionKey = "idx", metadata };
         var itemCustom = new { id = $"meta_test_{Guid.NewGuid():N}", partitionKey = "idx", metadata };
 
-        await CompareRuAsync(itemDefault, itemCustom);
+        await CompareRu(itemDefault, itemCustom);
     }
     #endregion
 
     #region Step 5
-    public async Task Step5Async()
+    public async Task Step5()
     {
         if (DB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
@@ -153,12 +153,12 @@ public class Steps_Indexing
         var itemDefault = new { id = $"both_test_{Guid.NewGuid():N}", partitionKey = "idx", largeBlob, metadata };
         var itemCustom = new { id = $"both_test_{Guid.NewGuid():N}", partitionKey = "idx", largeBlob, metadata };
 
-        await CompareRuAsync(itemDefault, itemCustom);
+        await CompareRu(itemDefault, itemCustom);
     }
     #endregion
 
     #region Helpers
-    private async Task CompareRuAsync<T>(T itemDefault, T itemCustom)
+    private async Task CompareRu<T>(T itemDefault, T itemCustom)
     {
         var defaultContainer = DB!.GetContainer(DefaultContainerName);
         var customContainer = DB!.GetContainer(CustomContainerName);

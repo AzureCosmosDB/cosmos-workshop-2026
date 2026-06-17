@@ -1,11 +1,11 @@
 // Lab 2F: Evaluation
 
-using CosmosLabs;
+using Lab2F;
 
 var steps = new Steps_Evaluation();
 
 Console.WriteLine("\n========== STEP 0: Initialize connection ==========");
-await steps.InitAsync();
+await steps.Init();
 Console.WriteLine("\n--- Press Enter to continue to Step 1 ---");
 await Console.In.ReadLineAsync();
 

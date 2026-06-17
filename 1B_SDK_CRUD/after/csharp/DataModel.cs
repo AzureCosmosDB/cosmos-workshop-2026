@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace CosmosLabs;
+namespace Lab1B;
 
 public class CatalogItemData
 {

@@ -10,7 +10,7 @@ using Azure.Identity;
 using Microsoft.Azure.Cosmos;
 using OpenAI.Chat;
 
-namespace CosmosLabs;
+namespace Lab2C;
 
 public class Steps_Completions_Embeddings
 {
@@ -28,7 +28,7 @@ public class Steps_Completions_Embeddings
     #endregion
 
     #region Init
-    public async Task InitAsync()
+    public async Task Init()
     {
         Console.WriteLine("\n=== Step 0: Setup (Connection) ===\n");
 
@@ -73,7 +73,7 @@ public class Steps_Completions_Embeddings
     #endregion
 
     #region Step 1
-    public async Task Step1Async()
+    public async Task Step1()
     {
         if (OpenAIClient is null) throw new InvalidOperationException("OpenAIClient not initialized. Run Step 0 first.");
 
@@ -110,7 +110,7 @@ public class Steps_Completions_Embeddings
     #endregion
 
     #region Step 2
-    public async Task Step2Async()
+    public async Task Step2()
     {
         if (OpenAIClient is null) throw new InvalidOperationException("OpenAIClient not initialized. Run Step 0 first.");
 
@@ -141,7 +141,7 @@ public class Steps_Completions_Embeddings
     #endregion
 
     #region Step 3
-    public async Task Step3Async()
+    public async Task Step3()
     {
         if (EmbeddingsOpenAIClient is null) throw new InvalidOperationException("EmbeddingsOpenAIClient not initialized. Run Step 0 first.");
 

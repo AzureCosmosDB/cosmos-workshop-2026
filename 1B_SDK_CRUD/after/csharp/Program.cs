@@ -1,26 +1,28 @@
 // Lab 1B: SDK Basics / CRUD
 
-using CosmosLabs;
+using Lab1B;
+
+var steps = new Steps_SDK_CRUD();
 
 Console.WriteLine("\n========== STEP 0: Initialize connection ==========");
-await Steps_SDK_CRUD.InitAsync();
+await steps.Init();
 Console.WriteLine("\n--- Press Enter to continue to Step 1 ---");
 await Console.In.ReadLineAsync();
 
 Console.WriteLine("\n========== STEP 1: Create an item ==========");
-await Steps_SDK_CRUD.Step1Async();
+await steps.Step1();
 Console.WriteLine("\n--- Press Enter to continue to Step 2 ---");
 await Console.In.ReadLineAsync();
 
 Console.WriteLine("\n========== STEP 2: Read the item ==========");
-await Steps_SDK_CRUD.Step2Async();
+await steps.Step2();
 Console.WriteLine("\n--- Press Enter to continue to Step 3 ---");
 await Console.In.ReadLineAsync();
 
 Console.WriteLine("\n========== STEP 3: Upsert the item ==========");
-await Steps_SDK_CRUD.Step3Async();
+await steps.Step3();
 Console.WriteLine("\n--- Press Enter to continue to Step 4 ---");
 await Console.In.ReadLineAsync();
 
 Console.WriteLine("\n========== STEP 4: Delete the item ==========");
-await Steps_SDK_CRUD.Step4Async();
+await steps.Step4();

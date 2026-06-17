@@ -8,7 +8,7 @@ using Microsoft.Azure.Cosmos;
 using OpenAI.Chat;
 using OpenAI.Embeddings;
 
-namespace CosmosLabs;
+namespace Lab2E;
 
 public class Steps_RAG_Pipeline
 {
@@ -67,7 +67,7 @@ public class Steps_RAG_Pipeline
     #endregion
 
     #region Init
-    public async Task InitAsync()
+    public async Task Init()
     {
         Console.WriteLine("\n=== Step 0: Setup (Connection) ===\n");
 
@@ -109,7 +109,7 @@ public class Steps_RAG_Pipeline
     #endregion
 
     #region Step 1
-    public Task Step1Async()
+    public Task Step1()
     {
         Console.WriteLine("\n=== Step 1: Text Chunking and Seed Documents ===\n");
 
@@ -156,7 +156,7 @@ public class Steps_RAG_Pipeline
     #endregion
 
     #region Step 2
-    public async Task Step2Async()
+    public async Task Step2()
     {
         if (Container is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
@@ -206,14 +206,14 @@ public class Steps_RAG_Pipeline
     #endregion
 
     #region Step 3
-    public async Task Step3Async()
+    public async Task Step3()
     {
         Console.WriteLine("\n=== Step 3: RAG Retrieval (STUDENT EXERCISE) ===\n");
 
         string testQuery = "What is vector search in Azure Cosmos DB?";
         Console.WriteLine($"Retrieving for: \"{testQuery}\"\n");
 
-        var results = await RetrieveRelevantAsync(testQuery, 3);
+        var results = await RetrieveRelevant(testQuery, 3);
         Console.WriteLine($"Found {results.Count} results:\n");
         foreach (var result in results)
         {
@@ -226,7 +226,7 @@ public class Steps_RAG_Pipeline
         Console.WriteLine("Retrieval complete.");
     }
 
-    private async Task<List<Dictionary<string, object>>> RetrieveRelevantAsync(string textQuery, int topK = 3)
+    private async Task<List<Dictionary<string, object>>> RetrieveRelevant(string textQuery, int topK = 3)
     {
         if (Container is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
@@ -258,24 +258,24 @@ public class Steps_RAG_Pipeline
     #endregion
 
     #region Step 4
-    public async Task Step4Async()
+    public async Task Step4()
     {
         Console.WriteLine("\n=== Step 4: RAG Generation (STUDENT EXERCISE) ===\n");
 
         string testQuestion = "What is vector search in Azure Cosmos DB?";
         Console.WriteLine($"Question: {testQuestion}");
 
-        string answer = await GenerateResponseAsync(testQuestion);
+        string answer = await GenerateResponse(testQuestion);
         Console.WriteLine($"\nAnswer:\n{answer}");
 
         Console.WriteLine("\n=== COMPLETE ===");
     }
 
-    private async Task<string> GenerateResponseAsync(string question)
+    private async Task<string> GenerateResponse(string question)
     {
         if (_chatClient is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
-        var results = await RetrieveRelevantAsync(question, 3);
+        var results = await RetrieveRelevant(question, 3);
         var context = string.Join("\n\n", results.Select(r => (string)r["text"]));
 
         var systemPrompt = $"You are a helpful assistant. Answer the user's question based on the following context:\n\n<context>{context}</context>";

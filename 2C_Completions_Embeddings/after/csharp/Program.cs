@@ -1,23 +1,23 @@
 // Lab 2C: Completions + Embeddings
 
-using CosmosLabs;
+using Lab2C;
 
 var steps = new Steps_Completions_Embeddings();
 
 Console.WriteLine("\n========== STEP 0: Initialize connection ==========");
-await steps.InitAsync();
+await steps.Init();
 Console.WriteLine("\n--- Press Enter to continue to Step 1 ---");
 await Console.In.ReadLineAsync();
 
 Console.WriteLine("\n========== STEP 1: Chat completions ==========");
-await steps.Step1Async();
+await steps.Step1();
 Console.WriteLine("\n--- Press Enter to continue to Step 2 ---");
 await Console.In.ReadLineAsync();
 
 Console.WriteLine("\n========== STEP 2: Streaming response ==========");
-await steps.Step2Async();
+await steps.Step2();
 Console.WriteLine("\n--- Press Enter to continue to Step 3 ---");
 await Console.In.ReadLineAsync();
 
 Console.WriteLine("\n========== STEP 3: Embeddings and cosine similarity ==========");
-await steps.Step3Async();
+await steps.Step3();
