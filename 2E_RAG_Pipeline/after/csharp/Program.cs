@@ -1,26 +1,28 @@
-// Lab 1B: SDK Basics / CRUD
+// Lab 2E: RAG Pipeline
 
 using CosmosLabs;
 
+var steps = new Steps_RAG_Pipeline();
+
 Console.WriteLine("\n========== STEP 0: Initialize connection ==========");
-await Steps_SDK_CRUD.InitAsync();
+await steps.InitAsync();
 Console.WriteLine("\n--- Press Enter to continue to Step 1 ---");
 await Console.In.ReadLineAsync();
 
-Console.WriteLine("\n========== STEP 1: Create an item ==========");
-await Steps_SDK_CRUD.Step1Async();
+Console.WriteLine("\n========== STEP 1: Chunk source documents ==========");
+await steps.Step1Async();
 Console.WriteLine("\n--- Press Enter to continue to Step 2 ---");
 await Console.In.ReadLineAsync();
 
-Console.WriteLine("\n========== STEP 2: Read the item ==========");
-await Steps_SDK_CRUD.Step2Async();
+Console.WriteLine("\n========== STEP 2: Embed and store chunks ==========");
+await steps.Step2Async();
 Console.WriteLine("\n--- Press Enter to continue to Step 3 ---");
 await Console.In.ReadLineAsync();
 
-Console.WriteLine("\n========== STEP 3: Upsert the item ==========");
-await Steps_SDK_CRUD.Step3Async();
+Console.WriteLine("\n========== STEP 3: RAG retrieval ==========");
+await steps.Step3Async();
 Console.WriteLine("\n--- Press Enter to continue to Step 4 ---");
 await Console.In.ReadLineAsync();
 
-Console.WriteLine("\n========== STEP 4: Delete the item ==========");
-await Steps_SDK_CRUD.Step4Async();
+Console.WriteLine("\n========== STEP 4: RAG generation ==========");
+await steps.Step4Async();

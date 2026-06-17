@@ -2,7 +2,6 @@
 
 using System.Diagnostics;
 using System.Text.Json;
-using System.IdentityModel.Tokens.Jwt;
 using Azure.Identity;
 using Azure.AI.OpenAI;
 using Microsoft.Azure.Cosmos;
@@ -10,7 +9,7 @@ using OpenAI.Chat;
 
 namespace Lab4A;
 
-public class Steps
+public class Steps_Chat_Memory
 {
     #region State
     // Cosmos DB clients
