@@ -6,7 +6,7 @@ using Microsoft.Azure.Cosmos;
 
 namespace CosmosLabs;
 
-public static class Steps
+public static class Steps_SDK_CRUD
 {
     public static CosmosClient? _client = null;
     public static Database? _database = null;
@@ -74,9 +74,7 @@ public static class Steps
                 item,
                 new PartitionKey("workshop"));
 
-            var requestCharge = response.RequestCharge;
-            Console.WriteLine($"  created item: {response.Resource.Id}");
-            Console.WriteLine($"  RU charged: {requestCharge}\n");
+            Console.WriteLine($"  created item: {response.Resource.Id}\n");
 
             _itemId = itemId;
         }
@@ -111,8 +109,7 @@ public static class Steps
                 new PartitionKey("workshop"));
 
             var json = JsonSerializer.Serialize(readResponse.Resource, new JsonSerializerOptions { WriteIndented = true });
-            Console.WriteLine($"  item: {json}");
-            Console.WriteLine($"  RU charged: {readResponse.RequestCharge}\n");
+            Console.WriteLine($"  item: {json}\n");
         }
         catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -156,8 +153,7 @@ public static class Steps
                 new PartitionKey("workshop"));
 
             Console.WriteLine($"  upserted item: {upsertResponse.Resource.Id}");
-            Console.WriteLine($"  new price: {upsertResponse.Resource.Data.Price}");
-            Console.WriteLine($"  RU charged: {upsertResponse.RequestCharge}\n");
+            Console.WriteLine($"  new price: {upsertResponse.Resource.Data.Price}\n");
         }
         catch (Exception ex)
         {
@@ -184,8 +180,7 @@ public static class Steps
                 new PartitionKey("workshop"));
 
             Console.WriteLine($"  deleted item: {itemId}");
-            Console.WriteLine($"  status: {deleteResponse.StatusCode}");
-            Console.WriteLine($"  RU charged: {deleteResponse.RequestCharge}\n");
+            Console.WriteLine($"  status: {deleteResponse.StatusCode}\n");
 
             Console.WriteLine("=== Lab Complete ===");
             Console.WriteLine("You have completed the CRUD operations exercise in C#. You:");
@@ -194,7 +189,6 @@ public static class Steps
             Console.WriteLine("- Read an item with ReadItemAsync()");
             Console.WriteLine("- Updated an item with UpsertItemAsync()");
             Console.WriteLine("- Deleted an item with DeleteItemAsync()");
-            Console.WriteLine("- Inspected RU charges from each operation response");
         }
         catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {

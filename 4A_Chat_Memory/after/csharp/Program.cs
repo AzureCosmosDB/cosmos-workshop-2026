@@ -2,7 +2,7 @@
 
 using Lab4A;
 
-var steps = new Steps();
+var steps = new Steps_Chat_Memory();
 
 Console.WriteLine("\n========== STEP 0: Initialize connections ==========");
 await steps.Init();

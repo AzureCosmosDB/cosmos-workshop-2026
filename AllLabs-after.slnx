@@ -1,4 +1,11 @@
 <Solution>
 <Project Path="1B_SDK_CRUD/after/csharp/1B_SDK_CRUD.csproj" />
+<Project Path="1D1_Query_Language/after/csharp/1D1_Query_Language.csproj" />
+<Project Path="1D2_Indexing/after/csharp/1D2_Indexing.csproj" />
+<Project Path="1E_Data_Modeling/after/csharp/1E_Data_Modeling.csproj" />
+<Project Path="2C_Completions_Embeddings/after/csharp/2C_Completions_Embeddings.csproj" />
+<Project Path="2D_Vector_Search/after/csharp/2D_Vector_Search.csproj" />
+<Project Path="2E_RAG_Pipeline/after/csharp/2E_RAG_Pipeline.csproj" />
+<Project Path="2F_Evaluation/after/csharp/2F_Evaluation.csproj" />
 <Project Path="4A_Chat_Memory/after/csharp/4A_Chat_Memory.csproj" />
 </Solution>

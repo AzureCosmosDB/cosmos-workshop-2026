@@ -49,11 +49,11 @@ The program runs each step in sequence and pauses between steps — press **Ente
 - **Step 0**: Connects using `DefaultAzureCredential` and prints the endpoint, database, and container info.
 - **Step 1**: Creates a new item in the `Catalog` container.
 
-  **Expected output**: The item ID and the RU charge (typically 2-3 RU for a small item).
+  **Expected output**: The item ID is printed.
 
   If you see a "item already exists" message, run the Delete step first to clean up.
-- **Step 2**: Read the item back from the `Catalog` container. Verify the output shows the item JSON with all properties and the RU charge (typically 1 RU for a small point read).
-- **Step 3**: Updates the item's price from 42.0 to 55.0 via upsert. Note the increased RU charge required to update an existing item.
+- **Step 2**: Read the item back from the `Catalog` container. Verify the output shows the item JSON with all properties.
+- **Step 3**: Updates the item's price from 42.0 to 55.0 via upsert.
 - **Step 4**: Deletes the item and prints the response status (should be 204/Ok).
 
 ## Lab Complete!
@@ -64,6 +64,5 @@ You have completed the CRUD exercise in C#. You:
 - Read the item back from Cosmos DB
 - Updated the item with upsert
 - Deleted the item
-- Inspected RU charges from each operation response
 
 To run the lab again from scratch, run `dotnet run` again. The program will walk through every step in sequence.
