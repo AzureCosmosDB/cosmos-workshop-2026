@@ -55,7 +55,7 @@ Sets up Cosmos DB clients for both the chat-memory and RAG containers, and Azure
 
 ### Step 1: Seed the RAG Corpus (Prebuilt)
 
-Loads `rag_seed_docs.json`, embeds each document, and upserts it into `WorkshopData/Docs` with `partitionKey = "rag"`. Upserts are idempotent — re-running the step (or having already run Lab 2C) is safe.
+Loads `rag_seed_docs.json`, embeds each document, and upserts it into `WorkshopData/Docs` with `partitionKey = "rag"`. Upserts are idempotent — re-running the step (or having already run Lab 2E) is safe.
 
 **Expected output**: One `Seeded: <title>` line per document, followed by a total count.
 

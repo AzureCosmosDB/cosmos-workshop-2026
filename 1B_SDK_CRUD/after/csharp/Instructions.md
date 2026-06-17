@@ -1,9 +1,9 @@
 # Lab 1B: SDK Basics / CRUD in C#
 
 **Time**: ~10 min  
-**Environment**: Terminal with `.`NET 10 SDK
+**Environment**: Terminal with `.NET 10 SDK`
 
-In this exercise you will perform Create, Read, Update, and Delete operations on Azure Cosmos DB using the C# `Azure.Cosmos` SDK v3 with `DefaultAzureCredential` authentication.
+In this exercise you will perform Create, Read, Update, and Delete operations on Azure Cosmos DB using the C# `Microsoft.Azure.Cosmos` SDK v3 with `DefaultAzureCredential` authentication.
 
 The lab uses the `1B_SDK_CRUD` directory. A console program walks through each step in sequence, pausing for **Enter** between steps so you can read the output before moving on. Each step builds on the previous one — you cannot run them out of order.
 
@@ -49,9 +49,9 @@ The program runs each step in sequence and pauses between steps — press **Ente
 - **Step 0**: Connects using `DefaultAzureCredential` and prints the endpoint, database, and container info.
 - **Step 1**: Creates a new item in the `Catalog` container.
 
-**Expected output**: The item ID and the RU charge (typically 2-3 RU for a small item).
+  **Expected output**: The item ID and the RU charge (typically 2-3 RU for a small item).
 
-If you see a "item already exists" message, run the Delete step first to clean up.
+  If you see a "item already exists" message, run the Delete step first to clean up.
 - **Step 2**: Read the item back from the `Catalog` container. Verify the output shows the item JSON with all properties and the RU charge (typically 1 RU for a small point read).
 - **Step 3**: Updates the item's price from 42.0 to 55.0 via upsert. Note the increased RU charge required to update an existing item.
 - **Step 4**: Deletes the item and prints the response status (should be 204/Ok).
