@@ -27,6 +27,7 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
     capabilities: [
       { name: 'EnableServerless' }
       { name: 'EnableNoSQLVectorSearch' }
+      { name: 'EnableFullTextSearch' }
     ]
     consistencyPolicy: {
       defaultConsistencyLevel: 'Session'
@@ -157,6 +158,28 @@ var indexingPolicyWithVector = {
       type: 'DiskANN'
     }
   ]
+  fullTextIndexes: [
+    {
+      path: '/text'
+    }
+    {
+      path: '/title'
+    }
+  ]
+}
+
+var fullTextPolicy = {
+  defaultLanguage: 'en-US'
+  fullTextPaths: [
+    {
+      path: '/text'
+      language: 'en-US'
+    }
+    {
+      path: '/title'
+      language: 'en-US'
+    }
+  ]
 }
 
 resource docsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = {
@@ -170,7 +193,58 @@ resource docsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/conta
         kind: 'Hash'
       }
       vectorEmbeddingPolicy: vectorEmbeddingPolicy
+      #disable-next-line BCP037
+      fullTextPolicy: fullTextPolicy
+      #disable-next-line BCP037
       indexingPolicy: indexingPolicyWithVector
+    }
+  }
+}
+
+// ========== LAB 1D2: INDEXING POLICY ==========
+
+resource itemsDefaultIndexContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = {
+  name: 'ItemsDefaultIndex'
+  parent: workshopDatabase
+  properties: {
+    resource: {
+      id: 'ItemsDefaultIndex'
+      partitionKey: {
+        paths: ['/partitionKey']
+        kind: 'Hash'
+      }
+      indexingPolicy: {
+        indexingMode: 'consistent'
+        automatic: true
+        includedPaths: [
+          { path: '/*' }
+        ]
+      }
+    }
+  }
+}
+
+resource itemsCustomIndexContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = {
+  name: 'ItemsCustomIndex'
+  parent: workshopDatabase
+  properties: {
+    resource: {
+      id: 'ItemsCustomIndex'
+      partitionKey: {
+        paths: ['/partitionKey']
+        kind: 'Hash'
+      }
+      indexingPolicy: {
+        indexingMode: 'consistent'
+        automatic: true
+        includedPaths: [
+          { path: '/*' }
+        ]
+        excludedPaths: [
+          { path: '/largeBlob/?' }
+          { path: '/metadata/*' }
+        ]
+      }
     }
   }
 }

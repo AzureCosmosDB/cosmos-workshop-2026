@@ -5,7 +5,9 @@ targetScope = 'resourceGroup'
 param accountName string
 param location string
 param common object
-param autoScaleMaxRU int = 1000
+param autoScaleSmallMaxRU int = 1000
+// Make containers for partitioning demo large enough to allow physical partitioning
+param autoScaleMaxRU int = 10000
 
 resource dbAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
   name: accountName
@@ -32,26 +34,34 @@ resource dbAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
   }
 }
 
-// ====== Accounts DB ======
+// ====== Modeling DB ======
+// Used for lab: Data Modeling
+// Provisioned throughput is used here so monitor reports per-partition RU consumption
 
-resource accountsDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-11-15' = {
-  name: 'Accounts'
+resource modelingDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-11-15' = {
+  name: 'Modeling'
   parent: dbAccount
   properties: {
     resource: {
-      id: 'Accounts'
+      id: 'Modeling'
+    }
+    // Mix of database and container level throughput
+    options: {
+      autoscaleSettings: {
+        maxThroughput: autoScaleSmallMaxRU
+      }
     }
   }
 }
 
-resource usersContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = {
-  name: 'Users'
-  parent: accountsDatabase
+resource ordersHotContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = {
+  name: 'OrdersHot'
+  parent: modelingDatabase
   properties: {
     resource: {
-      id: 'Users'
+      id: 'OrdersHot'
       partitionKey: {
-        paths: ['/userId']
+        paths: ['/customerId']
         kind: 'Hash'
       }
       indexingPolicy: {
@@ -61,6 +71,7 @@ resource usersContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/cont
         ]
       }
     }
+    // Container level throughput independent of the database setting
     options: {
       autoscaleSettings: {
         maxThroughput: autoScaleMaxRU
@@ -69,34 +80,16 @@ resource usersContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/cont
   }
 }
 
-// ====== Sales DB ======
-
-resource salesDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-11-15' = {
-  name: 'Sales'
-  parent: dbAccount
+resource ordersCompositeContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = {
+  name: 'OrdersComposite'
+  parent: modelingDatabase
   properties: {
     resource: {
-      id: 'Sales'
-    }
-    options: {
-      autoscaleSettings: {
-        maxThroughput: autoScaleMaxRU
-      }
-    }
-  }
-}
-
-resource inventoryContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = {
-  name: 'Inventory'
-  parent: salesDatabase
-  properties: {
-    resource: {
-      id: 'Inventory'
+      id: 'OrdersComposite'
       partitionKey: {
-        paths: ['/category']
+        paths: ['/partitionKey']
         kind: 'Hash'
       }
-      defaultTtl: -1
       indexingPolicy: {
         indexingMode: 'consistent'
         includedPaths: [
@@ -104,20 +97,27 @@ resource inventoryContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/
         ]
       }
     }
+    // Container level throughput independent of the database setting
+    options: {
+      autoscaleSettings: {
+        maxThroughput: autoScaleMaxRU
+      }
+    }
   }
 }
 
-resource ordersContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = {
-  name: 'Orders'
-  parent: salesDatabase
+resource eventsTtlContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = {
+  name: 'EventsTtl'
+  parent: modelingDatabase
   properties: {
     resource: {
-      id: 'Orders'
+      id: 'EventsTtl'
       partitionKey: {
-        paths: ['/orderId']
+        paths: ['/partitionKey']
         kind: 'Hash'
       }
-      defaultTtl: -1
+      // 30 days
+      defaultTtl: 2592000
       indexingPolicy: {
         indexingMode: 'consistent'
         includedPaths: [
