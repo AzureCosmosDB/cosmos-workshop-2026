@@ -1,7 +1,6 @@
 // Lab 1E: Data Modeling - Consolidated Steps
 
 #nullable enable
-using System.Net;
 using System.Text.Json;
 using Azure.Identity;
 using Microsoft.Azure.Cosmos;
@@ -12,346 +11,429 @@ public class Steps_Data_Modeling
 {
     #region State
     public string? Endpoint { get; private set; }
-    public string DbName { get; private set; } = "Modeling";
+    public string? ProvisionedEndpoint { get; private set; }
     public CosmosClient? Client { get; private set; }
-    public Database? DB { get; private set; }
+    public Database? RefDB { get; private set; }
+    public Database? EmbedDB { get; private set; }
+    public CosmosClient? ProvisionedClient { get; private set; }
+    public Database? ProvisionedDB { get; private set; }
+
+    public const string RefDbName = "ModelingReference";
+    public const string EmbedDbName = "ModelingEmbed";
+    public const string ProvisionedDbName = "Modeling";
+
     private const string HotContainerName = "OrdersHot";
     private const string CompositeContainerName = "OrdersComposite";
-    private const string TtlContainerName = "EventsTtl";
+
+    private const string PkValue = "default";
+    private static readonly PartitionKey Pk = new(PkValue);
+
     public bool Seeded { get; private set; }
+    public bool ReferenceFetchRan { get; private set; }
+    public bool EmbedFetchRan { get; private set; }
+    public bool AddressUpdateRan { get; private set; }
+    public bool UsagePatternsRan { get; private set; }
+    public bool HotSeeded { get; private set; }
     public bool CompositeVerified { get; private set; }
-    public bool FanOutQueryRun { get; private set; }
-    public bool TtlVerified { get; private set; }
+    public bool CompositeSeeded { get; private set; }
 
-    private CosmosClient CreateClient(string endpoint)
+    private static CosmosClient CreateClient(string endpoint)
     {
-        var credential = new DefaultAzureCredential();
-
+        var credential = new AzureCliCredential();
         return new CosmosClient(endpoint, credential, new CosmosClientOptions
         {
             SerializerOptions = new CosmosSerializationOptions { PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase }
         });
     }
+
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = true
+    };
+
+    private static async Task<JsonElement> LoadSeed(string fileName)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, fileName);
+        await using var stream = File.OpenRead(path);
+        var doc = await JsonDocument.ParseAsync(stream);
+        return doc.RootElement.Clone();
+    }
+
+    private static List<T> Section<T>(JsonElement root, string name) =>
+        root.GetProperty(name).Deserialize<List<T>>(JsonOpts)
+            ?? throw new InvalidOperationException($"Failed to deserialize section '{name}'");
     #endregion
 
     #region Init
     public async Task Init()
     {
-        Console.WriteLine("\n=== Step 0: Setup (Connection to provisioned-throughput account) ===\n");
+        Console.WriteLine("\n=== Step 0: Setup — Seed Reference and Embed Databases ===\n");
 
-        // Lab 1E uses the provisioned-throughput Cosmos account so per-partition RU
-        // metrics are available in Azure Monitor for the Step 6 comparison.
-        var endpoint = Environment.GetEnvironmentVariable("COSMOS_ENDPOINT_PROVISIONED")
-            ?? throw new InvalidOperationException("COSMOS_ENDPOINT_PROVISIONED environment variable is required (see SetEnv.ps1).");
+        var endpoint = Environment.GetEnvironmentVariable("COSMOS_ENDPOINT")
+            ?? throw new InvalidOperationException("COSMOS_ENDPOINT environment variable is required (see SetEnv.ps1).");
 
         Client = CreateClient(endpoint);
-        DB = Client.GetDatabase(DbName);
         Endpoint = endpoint;
+        RefDB = Client.GetDatabase(RefDbName);
+        EmbedDB = Client.GetDatabase(EmbedDbName);
 
-        Console.WriteLine($"  endpoint: {endpoint}");
-        Console.WriteLine($"  database: {DbName}");
-        Console.WriteLine($"  connected: {endpoint}{DbName}");
-    }
-    #endregion
+        Console.WriteLine($"  serverless endpoint: {endpoint}");
+        Console.WriteLine($"  reference DB:        {RefDbName}");
+        Console.WriteLine($"  embed DB:            {EmbedDbName}\n");
 
-    #region Seeding helpers
-    // ~1 KB filler so each write costs ~10 RU instead of ~5 RU to make the
-    // hot-partition pattern more clear on the 'Normalized RU Consumption (Max)' chart.
-    private const int OrderCount = 10000;
-    private const int Concurrency = 64;
-    private static readonly string Filler = new('x', 1024);
-    private static readonly string[] Statuses = ["pending", "shipped", "delivered"];
+        await SeedReference();
+        await SeedEmbed();
 
-    private static Dictionary<string, object> BuildOrder(int i, string customerId, string orderDate, string? partitionKey)
-    {
-        var order = new Dictionary<string, object>
-        {
-            { "id", $"order_{i}" },
-            { "customerId", customerId },
-            { "orderDate", orderDate },
-            { "total", Math.Round(10 + (i * 3.33), 2) },
-            { "status", Statuses[i % 3] },
-            { "items", new[] {
-                new { sku = $"SKU_{i%5}", qty = (i % 3)+1 },
-                new { sku = $"SKU_{(i+1)%5}", qty = ((i+1) % 3)+1 }
-            } },
-            { "notes", Filler }
-        };
-        if (partitionKey is not null) order["partitionKey"] = partitionKey;
-        return order;
-    }
-
-    private static async Task SeedOrders(
-        Container container,
-        IReadOnlyList<Dictionary<string, object>> orders,
-        Func<Dictionary<string, object>, PartitionKey> pkSelector)
-    {
-        var sem = new SemaphoreSlim(Concurrency);
-        int completed = 0;
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-
-        await Task.WhenAll(orders.Select(async order =>
-        {
-            await sem.WaitAsync();
-            try
-            {
-                var pk = pkSelector(order);
-                try
-                {
-                    await container.UpsertItemAsync(order, pk);
-                }
-                catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.TooManyRequests)
-                {
-                    // If we hit rate limits, back off and retry. With enough concurrency, it's possible to get some 429s on the hot partition container.
-                    Console.WriteLine($"  ...429 Too Many Requests for order {order["id"]}, retrying after {ex.RetryAfter?.TotalSeconds ?? 1:F1}s");
-                    await Task.Delay(ex.RetryAfter ?? TimeSpan.FromSeconds(1));
-                    await container.UpsertItemAsync(order, pk);
-                }
-
-                int done = Interlocked.Increment(ref completed);
-                if (done % 1000 == 0)
-                    Console.WriteLine($"  ...{done}/{orders.Count} ({sw.Elapsed.TotalSeconds:F1}s elapsed)");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error on order {order["id"]}: {ex.Message}");
-            }
-            finally
-            {
-                sem.Release();
-            }
-        }));
-
-        sw.Stop();
-        Console.WriteLine($"Wrote {orders.Count} orders to '{container.Id}' in {sw.Elapsed.TotalSeconds:F1}s");
-    }
-    #endregion
-
-    #region Step 1
-    public async Task Step1()
-    {
-        if (DB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
-
-        Console.WriteLine($"\n=== Step 1: Seed Data with Hot Partition into '{HotContainerName}' ===\n");
-
-        // Every order uses customerId 'CUST_001', so all 10k writes hit one logical partition.
-        var orders = Enumerable.Range(0, OrderCount).Select(i => BuildOrder(
-            i,
-            customerId: "CUST_001",
-            orderDate: new DateTime(2026, 1, 1).AddDays(i % 28).ToString("yyyy-MM-dd"),
-            partitionKey: null)).ToList();
-
-        Console.WriteLine($"Seeding {orders.Count} orders into '{HotContainerName}' (all customerId='CUST_001')");
-        Console.WriteLine($"Using {Concurrency} concurrent writers to drive sustained RU on the hot partition...");
-
-        var hotPk = new PartitionKey("CUST_001");
-        await SeedOrders(DB.GetContainer(HotContainerName), orders, _ => hotPk);
-
-        Console.WriteLine("Note: All orders use the same partition key 'CUST_001' - this creates a hot partition.");
-        Console.WriteLine("Check Azure Portal > Cosmos DB > Metrics > 'Normalized RU Consumption (Max)' split by PartitionKeyRangeId");
-        Console.WriteLine("to see a single partition pinned near 100% while the others stay flat.");
         Seeded = true;
     }
+
+    private async Task SeedReference()
+    {
+        Console.WriteLine($"Seeding '{RefDbName}' (one container per entity) ...");
+        var root = await LoadSeed("seed-reference.json");
+        await UpsertAll(RefDB!.GetContainer("Customers"),         Section<Customer>(root, "customers"),         c => c.Id);
+        await UpsertAll(RefDB!.GetContainer("Addresses"),         Section<Address>(root, "addresses"),          a => a.Id);
+        await UpsertAll(RefDB!.GetContainer("ProductCategories"), Section<ProductCategory>(root, "productCategories"), c => c.Id);
+        await UpsertAll(RefDB!.GetContainer("Products"),          Section<Product>(root, "products"),           p => p.Id);
+        await UpsertAll(RefDB!.GetContainer("Orders"),            Section<Order>(root, "orders"),               o => o.Id);
+        await UpsertAll(RefDB!.GetContainer("OrderItems"),        Section<OrderItem>(root, "orderItems"),       i => i.Id);
+    }
+
+    private async Task SeedEmbed()
+    {
+        Console.WriteLine($"Seeding '{EmbedDbName}' (denormalized — addresses on customer, lines on order) ...");
+        var root = await LoadSeed("seed-embed.json");
+        await UpsertAll(EmbedDB!.GetContainer("Customers"), Section<CustomerDocument>(root, "customers"), c => c.Id);
+        await UpsertAll(EmbedDB!.GetContainer("Products"),  Section<ProductDocument>(root, "products"),   p => p.Id);
+
+        var ordersContainer = EmbedDB!.GetContainer("Orders");
+        foreach (var doc in root.GetProperty("orders").EnumerateArray())
+        {
+            var docType = doc.GetProperty("docType").GetString();
+            var id = doc.GetProperty("id").GetString();
+            if (docType == "order")
+            {
+                var order = doc.Deserialize<OrderDocument>(JsonOpts)!;
+                await ordersContainer.UpsertItemAsync(order, Pk);
+            }
+            else
+            {
+                var invoice = doc.Deserialize<ServiceInvoice>(JsonOpts)!;
+                await ordersContainer.UpsertItemAsync(invoice, Pk);
+            }
+            Console.WriteLine($"    upserted Orders/{id} ({docType})");
+        }
+    }
+
+    private static async Task UpsertAll<T>(Container container, IEnumerable<T> items, Func<T, string> idSelector)
+    {
+        int count = 0;
+        foreach (var item in items)
+        {
+            await container.UpsertItemAsync(item, Pk);
+            Console.WriteLine($"    upserted {container.Id}/{idSelector(item)}");
+            count++;
+        }
+        Console.WriteLine($"  -> {count} docs in {container.Id}");
+    }
     #endregion
 
-    #region Step 2
+    #region Step 1 — Reference model: assemble a complete order
+    public async Task Step1()
+    {
+        if (RefDB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
+
+        Console.WriteLine("\n=== Step 1: Fetch a Complete Order — REFERENCE Model ===\n");
+        Console.WriteLine("Walking references across six containers; each hop is its own round-trip.\n");
+
+        const string targetOrderId = "order_001";
+        double totalRu = 0;
+        int roundTrips = 0;
+
+        var orders = RefDB.GetContainer("Orders");
+        var orderItems = RefDB.GetContainer("OrderItems");
+        var products = RefDB.GetContainer("Products");
+        var categories = RefDB.GetContainer("ProductCategories");
+        var customers = RefDB.GetContainer("Customers");
+        var addresses = RefDB.GetContainer("Addresses");
+
+        var orderResp = await orders.ReadItemAsync<Order>(targetOrderId, Pk);
+        roundTrips++; totalRu += orderResp.RequestCharge;
+        var order = orderResp.Resource;
+        Console.WriteLine($"  [1] Read Orders/{order.Id}                              {orderResp.RequestCharge,5:F2} RU");
+
+        var itemsQuery = new QueryDefinition("SELECT * FROM c WHERE c.orderId = @orderId").WithParameter("@orderId", order.Id);
+        var items = new List<OrderItem>();
+        using (var iter = orderItems.GetItemQueryIterator<OrderItem>(itemsQuery, requestOptions: new QueryRequestOptions { PartitionKey = Pk }))
+        {
+            while (iter.HasMoreResults)
+            {
+                var batch = await iter.ReadNextAsync();
+                roundTrips++; totalRu += batch.RequestCharge;
+                items.AddRange(batch);
+                Console.WriteLine($"  [2] Query OrderItems WHERE orderId='{order.Id}'    {batch.RequestCharge,5:F2} RU ({batch.Count} rows)");
+            }
+        }
+
+        foreach (var item in items)
+        {
+            var prodResp = await products.ReadItemAsync<Product>(item.ProductId, Pk);
+            roundTrips++; totalRu += prodResp.RequestCharge;
+            var product = prodResp.Resource;
+            Console.WriteLine($"  [3] Read Products/{item.ProductId}                          {prodResp.RequestCharge,5:F2} RU  ({product.Name})");
+
+            var catResp = await categories.ReadItemAsync<ProductCategory>(product.CategoryId, Pk);
+            roundTrips++; totalRu += catResp.RequestCharge;
+            Console.WriteLine($"  [4] Read ProductCategories/{product.CategoryId}              {catResp.RequestCharge,5:F2} RU  ({catResp.Resource.Category})");
+        }
+
+        var custResp = await customers.ReadItemAsync<Customer>(order.CustomerId, Pk);
+        roundTrips++; totalRu += custResp.RequestCharge;
+        Console.WriteLine($"  [5] Read Customers/{order.CustomerId}                         {custResp.RequestCharge,5:F2} RU  ({custResp.Resource.Name})");
+
+        var addrResp = await addresses.ReadItemAsync<Address>(order.AddressId, Pk);
+        roundTrips++; totalRu += addrResp.RequestCharge;
+        var address = addrResp.Resource;
+        Console.WriteLine($"  [6] Read Addresses/{order.AddressId}                          {addrResp.RequestCharge,5:F2} RU  ({address.Street}, {address.City})");
+
+        Console.WriteLine();
+        Console.WriteLine($"  Totals: {roundTrips} round-trips, {totalRu:F2} RU");
+
+        ReferenceFetchRan = true;
+    }
+    #endregion
+
+    #region Step 2 — Embed model: one read returns the whole order
     public async Task Step2()
     {
-        if (DB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
+        if (EmbedDB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
-        Console.WriteLine($"\n=== Step 2: Inspect Composite-Key Container '{CompositeContainerName}' (STUDENT EXERCISE) ===\n");
+        Console.WriteLine("\n=== Step 2: Fetch a Complete Order — EMBED Model ===\n");
+        Console.WriteLine("Customer snapshot and line items are already on the order doc — one point read returns everything.\n");
 
-        // Student exercise: Read the container properties and confirm it's keyed on
-        // '/partitionKey' — a synthetic composite of customerId and orderDate (e.g.
-        // "CUST_001#2026-01-15"). Step 3 will write that value into each document.
+        const string targetOrderId = "order_001";
+        var orders = EmbedDB.GetContainer("Orders");
 
-        var container = DB.GetContainer(CompositeContainerName);
-        var props = await container.ReadContainerAsync();
-        var pkPaths = props.Resource.PartitionKeyPaths;
+        var resp = await orders.ReadItemAsync<OrderDocument>(targetOrderId, Pk);
+        var order = resp.Resource;
 
-        Console.WriteLine($"  Container '{CompositeContainerName}' found");
-        Console.WriteLine($"    Partition key paths: {string.Join(", ", pkPaths)}");
+        Console.WriteLine($"  Read Orders/{order.Id}                              {resp.RequestCharge,5:F2} RU");
+        Console.WriteLine($"    customer:   {order.CustomerName} <{order.CustomerId}>");
+        Console.WriteLine($"    ship to:    {order.CustomerStreet}, {order.CustomerCity}, {order.CustomerState} {order.CustomerZipCode}");
+        Console.WriteLine($"    date/total: {order.Date:yyyy-MM-dd}   ${order.TotalAmount:F2}");
+        Console.WriteLine($"    lines:");
+        foreach (var line in order.Lines)
+            Console.WriteLine($"      - {line.Quantity} x {line.ProductName,-22} ({line.ProductCategory,-12}) @ ${line.ProductPrice,6:F2} = ${line.LineTotal,7:F2}");
 
-        bool ok = pkPaths.Contains("/partitionKey");
-        Console.WriteLine(ok
-            ? "  Composite container verified (synthetic '/partitionKey')."
-            : "  WARNING: expected partition key path '/partitionKey' not present.");
-        CompositeVerified = ok;
+        Console.WriteLine();
+        Console.WriteLine($"  Totals: 1 round-trip, {resp.RequestCharge:F2} RU");
+
+        EmbedFetchRan = true;
     }
     #endregion
 
-    #region Step 3
+    #region Step 3 — Updating a customer address: write tradeoffs
     public async Task Step3()
     {
-        if (DB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
+        if (RefDB is null || EmbedDB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
-        Console.WriteLine($"\n=== Step 3: Re-seed with Composite Partition Key into '{CompositeContainerName}' (STUDENT EXERCISE) ===\n");
+        Console.WriteLine("\n=== Step 3: Update a Customer Address — Model Tradeoffs ===\n");
+        Console.WriteLine("cust_001 moves: '100 Main St, Seattle WA' -> '555 New Lane, Bellevue WA'.\n");
 
-        // Synthetic composite key 'customerId#orderDate' spreads the same 10k writes
-        // across 50 customers x 100 dates = up to 5000 logical partitions.
-        var orders = Enumerable.Range(0, OrderCount).Select(i =>
+        const string customerId = "cust_001";
+        const string addressId = "addr_001";
+        const string newStreet = "555 New Lane";
+        const string newCity = "Bellevue";
+        const string newState = "WA";
+        const string newZip = "98004";
+
+        Console.WriteLine("Reference model — update the single Addresses row; every order resolves it on next read.");
+        var refAddresses = RefDB.GetContainer("Addresses");
+        var refAddr = (await refAddresses.ReadItemAsync<Address>(addressId, Pk)).Resource;
+        refAddr.Street = newStreet; refAddr.City = newCity; refAddr.State = newState; refAddr.ZipCode = newZip;
+        var refReplace = await refAddresses.ReplaceItemAsync(refAddr, addressId, Pk);
+        Console.WriteLine($"  Replaced Addresses/{addressId}    {refReplace.RequestCharge:F2} RU  (1 write)");
+
+        Console.WriteLine("\nEmbed model — update the customer doc, but past orders still carry the old snapshotted address.");
+        var embedCustomers = EmbedDB.GetContainer("Customers");
+        var embedOrders = EmbedDB.GetContainer("Orders");
+
+        var cust = (await embedCustomers.ReadItemAsync<CustomerDocument>(customerId, Pk)).Resource;
+        var addr = cust.Addresses[0];
+        addr.Street = newStreet; addr.City = newCity; addr.State = newState; addr.ZipCode = newZip;
+        var custReplace = await embedCustomers.ReplaceItemAsync(cust, customerId, Pk);
+        Console.WriteLine($"  Replaced Customers/{customerId}    {custReplace.RequestCharge:F2} RU");
+
+        var staleOrder = (await embedOrders.ReadItemAsync<OrderDocument>("order_001", Pk)).Resource;
+        Console.WriteLine($"  order_001 ship-to (still snapshotted): {staleOrder.CustomerStreet}, {staleOrder.CustomerCity}");
+
+        Console.WriteLine("\nFanning out the update — query affected orders, replace each one (the change-feed pattern, inline).");
+        var query = new QueryDefinition(
+            "SELECT * FROM c WHERE c.docType = 'order' AND c.customerId = @custId"
+        ).WithParameter("@custId", customerId);
+
+        double fanOutRu = 0; int updated = 0;
+        using (var iter = embedOrders.GetItemQueryIterator<OrderDocument>(query, requestOptions: new QueryRequestOptions { PartitionKey = Pk }))
         {
-            string customerId = $"CUST_{(i % 50):D3}";
-            string orderDate = new DateTime(2026, 1, 1).AddDays(i % 100).ToString("yyyy-MM-dd");
-            return BuildOrder(i, customerId, orderDate, partitionKey: $"{customerId}#{orderDate}");
-        }).ToList();
+            while (iter.HasMoreResults)
+            {
+                var batch = await iter.ReadNextAsync();
+                fanOutRu += batch.RequestCharge;
+                foreach (var ord in batch)
+                {
+                    ord.CustomerStreet = newStreet;
+                    ord.CustomerCity = newCity;
+                    ord.CustomerState = newState;
+                    ord.CustomerZipCode = newZip;
+                    var r = await embedOrders.ReplaceItemAsync(ord, ord.Id, Pk);
+                    fanOutRu += r.RequestCharge;
+                    updated++;
+                }
+            }
+        }
+        Console.WriteLine($"  Fan-out replaced {updated} order doc(s)    {fanOutRu:F2} RU");
 
-        Console.WriteLine($"Re-seeding {orders.Count} orders into '{CompositeContainerName}' (composite '/partitionKey')");
-        Console.WriteLine($"Using {Concurrency} concurrent writers...");
-
-        await SeedOrders(
-            DB.GetContainer(CompositeContainerName),
-            orders,
-            order => new PartitionKey((string)order["partitionKey"]));
-
-        Console.WriteLine("Note: Same write volume as Step 1, but spread across ~5000 logical partitions. Difference in run time between the two containers is often visible immediately.");
-        Console.WriteLine("In a few minutes, metrics will be visible in Azure Portal showing the actual partition distribution which you can check at the end of this lab.");
+        AddressUpdateRan = true;
     }
     #endregion
 
-    #region Step 4
+    #region Step 4 — Designing by usage patterns: orders by customer name
     public async Task Step4()
     {
-        if (DB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
+        if (EmbedDB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
-        Console.WriteLine("\n=== Step 4: Query for Denormalized Fan-Out Pattern (STUDENT EXERCISE) ===\n");
+        Console.WriteLine("\n=== Step 4: Designing by Usage Patterns — Orders by Customer Name ===\n");
+        Console.WriteLine("The snapshotted customerName on each order doc makes this a single-container query, no join.\n");
 
-        var hotContainer = DB.GetContainer(HotContainerName);
+        var orders = EmbedDB.GetContainer("Orders");
+        const string customerName = "Alice Anderson";
 
-        // Denormalization: line items live INSIDE each order document, so a single
-        // query returns the order AND its items together — no second round-trip,
-        // no cross-container join.
+        var query = new QueryDefinition(
+            "SELECT * FROM c WHERE c.docType = 'order' AND c.customerName = @name"
+        ).WithParameter("@name", customerName);
 
-        string fanOutQuery = "SELECT c.id, c.total, c.status, c.items FROM c WHERE c.id IN ('order_0','order_1','order_2')";
-        var queryDefinition = new QueryDefinition(fanOutQuery);
-
-        var streamIterator = hotContainer.GetItemQueryStreamIterator(
-            queryDefinition,
-            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey("CUST_001") });
-
-        double totalRu = 0;
-        int orders = 0, totalItems = 0;
-        var prettyOpts = new JsonSerializerOptions { WriteIndented = true };
-
-        while (streamIterator.HasMoreResults)
+        double ru = 0; int rows = 0;
+        using var iter = orders.GetItemQueryIterator<OrderDocument>(query, requestOptions: new QueryRequestOptions { PartitionKey = Pk });
+        while (iter.HasMoreResults)
         {
-            using var response = await streamIterator.ReadNextAsync();
-            totalRu += response.Headers.RequestCharge;
-
-            using var doc = await JsonDocument.ParseAsync(response.Content);
-            foreach (var order in doc.RootElement.GetProperty("Documents").EnumerateArray())
+            var batch = await iter.ReadNextAsync();
+            ru += batch.RequestCharge;
+            foreach (var o in batch)
             {
-                orders++;
-                var items = order.GetProperty("items");
-                totalItems += items.GetArrayLength();
-
-                Console.WriteLine($"Order {order.GetProperty("id").GetString()} " +
-                    $"(status={order.GetProperty("status").GetString()}, total={order.GetProperty("total").GetDouble():F2}):");
-                Console.WriteLine($"  items (embedded, no join needed): {JsonSerializer.Serialize(items, prettyOpts)}");
+                rows++;
+                Console.WriteLine($"  - {o.Id} on {o.Date:yyyy-MM-dd}   ${o.TotalAmount:F2}");
             }
         }
 
-        Console.WriteLine($"\nRetrieved {orders} orders with {totalItems} embedded line items in one query.");
-        Console.WriteLine($"Total RU charged: {totalRu:F2}");
-        Console.WriteLine("Compare to a normalized model: 1 query for orders + N queries (or a join) for line items.");
+        Console.WriteLine();
+        Console.WriteLine($"  {rows} order(s) for '{customerName}', {ru:F2} RU");
 
-        FanOutQueryRun = true;
+        UsagePatternsRan = true;
     }
     #endregion
 
-    #region Step 5
+    #region Provisioned account helpers (Steps 5–7)
+    private void EnsureProvisionedClient()
+    {
+        if (ProvisionedClient is not null) return;
+
+        var endpoint = Environment.GetEnvironmentVariable("COSMOS_ENDPOINT_PROVISIONED")
+            ?? throw new InvalidOperationException(
+                "Steps 5–7 require the provisioned-throughput account. Set COSMOS_ENDPOINT_PROVISIONED " +
+                "(see SetEnv.ps1) — Azure Monitor needs per-partition RU metrics that serverless doesn't expose.");
+
+        ProvisionedClient = CreateClient(endpoint);
+        ProvisionedEndpoint = endpoint;
+        ProvisionedDB = ProvisionedClient.GetDatabase(ProvisionedDbName);
+        Console.WriteLine($"  provisioned endpoint: {endpoint}");
+        Console.WriteLine($"  modeling DB:          {ProvisionedDbName}\n");
+    }
+
+    private const int PartitionDemoCount = 100;
+
+    private record HotOrder(string Id, string CustomerId, string OrderDate, double Total);
+    private record CompositeOrder(string Id, string CustomerId, string OrderDate, string PartitionKey, double Total);
+
+    private static async Task<List<string>> GetDistinctPartitionKeyValues(Container container, string field)
+    {
+        var query = new QueryDefinition($"SELECT DISTINCT VALUE {field} FROM c");
+        var values = new List<string>();
+        using var iter = container.GetItemQueryIterator<string>(query);
+        while (iter.HasMoreResults)
+        {
+            var batch = await iter.ReadNextAsync();
+            values.AddRange(batch);
+        }
+        return values;
+    }
+    #endregion
+
+    #region Step 5 — Hot-partition seed
     public async Task Step5()
     {
-        if (DB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
+        Console.WriteLine($"\n=== Step 5: Hot Partition Seed into '{HotContainerName}' ===\n");
+        Console.WriteLine("Partitioning by date is a classic anti-pattern: every write 'today' lands on one partition.\n");
+        EnsureProvisionedClient();
 
-        Console.WriteLine($"\n=== Step 5: Per-Item TTL Override in '{TtlContainerName}' (STUDENT EXERCISE) ===\n");
+        var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var container = ProvisionedDB!.GetContainer(HotContainerName);
+        var hotPk = new PartitionKey(today);
 
-        var container = DB.GetContainer(TtlContainerName);
-        var props = await container.ReadContainerAsync();
-        int? defaultTtl = props.Resource.DefaultTimeToLive;
-        const int thirtyDaysInSeconds = 30 * 24 * 60 * 60;
-
-        Console.WriteLine($"  Container DefaultTimeToLive: {(defaultTtl?.ToString() ?? "<not set>")} seconds " +
-            $"({(defaultTtl is int s ? s / 86400 : 0)} days)");
-
-        if (defaultTtl != thirtyDaysInSeconds)
-            Console.WriteLine($"  WARNING: expected DefaultTimeToLive = {thirtyDaysInSeconds} (30 days).");
-
-        // Per-item ttl property overrides the container default:
-        //   ttl =  N  -> this item expires N seconds after its _ts
-        //   ttl = -1  -> this item never expires, even though the container has a default
-        //   (omit)    -> falls back to the container's DefaultTimeToLive (30 days here)
-
-        const string pk = "ttl-demo";
-        const int shortTtlSeconds = 5;
-
-        var shortLived = new Dictionary<string, object>
+        for (int i = 0; i < PartitionDemoCount; i++)
         {
-            { "id", "short-lived" }, { "partitionKey", pk },
-            { "ttl", shortTtlSeconds },
-            { "note", $"per-item ttl override: expires in {shortTtlSeconds}s" }
-        };
-        var neverExpires = new Dictionary<string, object>
-        {
-            { "id", "never-expires" }, { "partitionKey", pk },
-            { "ttl", -1 },
-            { "note", "ttl=-1 disables expiration even though container default is 30 days" }
-        };
-        var defaultBehavior = new Dictionary<string, object>
-        {
-            { "id", "default-ttl" }, { "partitionKey", pk },
-            { "note", "no ttl property -> inherits container default (30 days)" }
-        };
-
-        await container.UpsertItemAsync(shortLived, new PartitionKey(pk));
-        await container.UpsertItemAsync(neverExpires, new PartitionKey(pk));
-        await container.UpsertItemAsync(defaultBehavior, new PartitionKey(pk));
-        Console.WriteLine("\n  Wrote 3 items: short-lived (ttl=5), never-expires (ttl=-1), default-ttl (no override)");
-
-        int waitSeconds = shortTtlSeconds + 10;
-        Console.WriteLine($"  Waiting {waitSeconds}s for the short-lived item to expire...");
-        await Task.Delay(TimeSpan.FromSeconds(waitSeconds));
-
-        async Task<bool> Exists(string id)
-        {
-            try
-            {
-                await container.ReadItemAsync<JsonElement>(id, new PartitionKey(pk));
-                return true;
-            }
-            catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
-            {
-                return false;
-            }
+            var order = new HotOrder($"order_{i}", $"CUST_{(i % 50):D3}", today, Math.Round(10 + (i * 3.33), 2));
+            await container.UpsertItemAsync(order, hotPk);
         }
 
-        bool shortAlive = await Exists("short-lived");
-        bool neverAlive = await Exists("never-expires");
-        bool defaultAlive = await Exists("default-ttl");
+        var distinct = await GetDistinctPartitionKeyValues(container, "c.orderDate");
+        Console.WriteLine($"  Seeded {PartitionDemoCount} orders. Distinct /orderDate values across the container: {distinct.Count}");
+        foreach (var v in distinct) Console.WriteLine($"    - {v}");
 
-        Console.WriteLine("\n  Read-back after wait:");
-        Console.WriteLine($"    short-lived   (ttl=5)         exists? {shortAlive}    expected: False");
-        Console.WriteLine($"    never-expires (ttl=-1)        exists? {neverAlive}    expected: True");
-        Console.WriteLine($"    default-ttl   (no override)   exists? {defaultAlive}    expected: True (30-day default)");
-
-        // The TTL background process is best-effort, not instant. Items can occasionally
-        // linger a few seconds past their deadline before the sweeper deletes them, so
-        // we treat 'short-lived is gone' as the success signal but don't hard-fail.
-        TtlVerified = defaultTtl == thirtyDaysInSeconds && neverAlive && defaultAlive;
-        if (shortAlive)
-            Console.WriteLine("  NOTE: short-lived item hasn't been swept yet — TTL deletion is asynchronous; retry in a few seconds.");
+        HotSeeded = true;
     }
     #endregion
 
-    #region Step 6
+    #region Step 6 — Composite-key container and reseed
     public async Task Step6()
     {
-        if (DB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
+        Console.WriteLine($"\n=== Step 6: Composite Partition Key Seed into '{CompositeContainerName}' ===\n");
+        Console.WriteLine("Same volume, same day — but customerId#date spreads writes across ~50 logical partitions.\n");
+        EnsureProvisionedClient();
 
-        Console.WriteLine("\n=== Step 6: Compare RU Distribution ===\n");
-        Console.WriteLine("Hot partition container should show spike in Throughput Metrics in Azure Portal");
-        Console.WriteLine("Composite container should show flat distribution across partitions");
-        Console.WriteLine("\nCheck Azure Portal > Cosmos DB > Monitoring > Insights > Throughput tab > Normalized RU Consumption (Max) Heat Map By PartitionKeyRangeID");
+        var container = ProvisionedDB!.GetContainer(CompositeContainerName);
+        var props = await container.ReadContainerAsync();
+        CompositeVerified = props.Resource.PartitionKeyPaths.Contains("/partitionKey");
+        Console.WriteLine($"  Container '{CompositeContainerName}' partition key paths: {string.Join(", ", props.Resource.PartitionKeyPaths)}");
+
+        var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+
+        for (int i = 0; i < PartitionDemoCount; i++)
+        {
+            var customerId = $"CUST_{(i % 50):D3}";
+            var pk = $"{customerId}#{today}";
+            var order = new CompositeOrder($"order_{i}", customerId, today, pk, Math.Round(10 + (i * 3.33), 2));
+            await container.UpsertItemAsync(order, new PartitionKey(pk));
+        }
+
+        var distinct = await GetDistinctPartitionKeyValues(container, "c.partitionKey");
+        Console.WriteLine($"  Seeded {PartitionDemoCount} orders. Distinct /partitionKey values across the container: {distinct.Count}");
+
+        CompositeSeeded = true;
+    }
+    #endregion
+
+    #region Step 7 — Distribution summary
+    public Task Step7()
+    {
+        Console.WriteLine("\n=== Step 7: Partition Distribution Summary ===\n");
+        Console.WriteLine($"  '{HotContainerName}':       1 distinct partition-key value — all writes pinned to today's date.");
+        Console.WriteLine($"  '{CompositeContainerName}': ~50 distinct partition-key values — one per (customer, day).");
+        Console.WriteLine();
+        Console.WriteLine("At production scale (>10k RU/s with multiple physical partitions) this distribution shows up directly in Azure Monitor:");
+        Console.WriteLine("  Cosmos DB > Monitoring > Insights > Throughput > 'Normalized RU Consumption (Max)' By PartitionKeyRangeId");
+        Console.WriteLine("  - hot partitions spike one range while composite spreads across multiple ranges with lower max usage.");
+        return Task.CompletedTask;
     }
     #endregion
 }

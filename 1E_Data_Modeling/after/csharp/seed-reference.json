@@ -1,0 +1,36 @@
+{
+  "customers": [
+    { "id": "cust_001", "partitionKey": "default", "name": "Alice Anderson" },
+    { "id": "cust_002", "partitionKey": "default", "name": "Bob Brown" },
+    { "id": "cust_003", "partitionKey": "default", "name": "Carol Chen" }
+  ],
+  "addresses": [
+    { "id": "addr_001", "partitionKey": "default", "customerId": "cust_001", "street": "100 Main St", "city": "Seattle",       "state": "WA", "zipCode": "98101" },
+    { "id": "addr_002", "partitionKey": "default", "customerId": "cust_002", "street": "200 Oak Ave", "city": "Portland",      "state": "OR", "zipCode": "97201" },
+    { "id": "addr_003", "partitionKey": "default", "customerId": "cust_003", "street": "300 Pine Rd", "city": "San Francisco", "state": "CA", "zipCode": "94107" }
+  ],
+  "productCategories": [
+    { "id": "cat_001", "partitionKey": "default", "category": "Electronics" },
+    { "id": "cat_002", "partitionKey": "default", "category": "Books" },
+    { "id": "cat_003", "partitionKey": "default", "category": "Furniture" }
+  ],
+  "products": [
+    { "id": "prod_001", "partitionKey": "default", "name": "Wireless Headphones", "price":  79.99, "categoryId": "cat_001" },
+    { "id": "prod_002", "partitionKey": "default", "name": "Smart Watch",         "price": 249.00, "categoryId": "cat_001" },
+    { "id": "prod_003", "partitionKey": "default", "name": "Cosmos DB Cookbook",  "price":  39.99, "categoryId": "cat_002" },
+    { "id": "prod_004", "partitionKey": "default", "name": "Standing Desk",       "price": 399.00, "categoryId": "cat_003" },
+    { "id": "prod_005", "partitionKey": "default", "name": "Office Chair",        "price": 299.00, "categoryId": "cat_003" }
+  ],
+  "orders": [
+    { "id": "order_001", "partitionKey": "default", "customerId": "cust_001", "addressId": "addr_001", "orderDate": "2026-01-15T00:00:00Z", "totalAmount": 119.98 },
+    { "id": "order_002", "partitionKey": "default", "customerId": "cust_002", "addressId": "addr_002", "orderDate": "2026-02-10T00:00:00Z", "totalAmount": 498.00 },
+    { "id": "order_003", "partitionKey": "default", "customerId": "cust_001", "addressId": "addr_001", "orderDate": "2026-03-05T00:00:00Z", "totalAmount": 698.00 }
+  ],
+  "orderItems": [
+    { "id": "oi_001", "partitionKey": "default", "orderId": "order_001", "productId": "prod_001", "quantity": 1, "lineTotal":  79.99 },
+    { "id": "oi_002", "partitionKey": "default", "orderId": "order_001", "productId": "prod_003", "quantity": 1, "lineTotal":  39.99 },
+    { "id": "oi_003", "partitionKey": "default", "orderId": "order_002", "productId": "prod_002", "quantity": 2, "lineTotal": 498.00 },
+    { "id": "oi_004", "partitionKey": "default", "orderId": "order_003", "productId": "prod_004", "quantity": 1, "lineTotal": 399.00 },
+    { "id": "oi_005", "partitionKey": "default", "orderId": "order_003", "productId": "prod_005", "quantity": 1, "lineTotal": 299.00 }
+  ]
+}

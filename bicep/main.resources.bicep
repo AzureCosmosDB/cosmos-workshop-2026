@@ -57,6 +57,15 @@ param foundryModelName string
 @description('Azure AI Foundry chat model version')
 param foundryModelVersion string
 
+@description('Azure AI Foundry embedding model deployment name')
+param foundryEmbeddingDeploymentName string
+
+@description('Azure AI Foundry embedding model name (e.g. text-embedding-3-small)')
+param foundryEmbeddingModelName string
+
+@description('Azure AI Foundry embedding model version')
+param foundryEmbeddingModelVersion string
+
 @description('Azure AI Foundry account SKU (S0 = standard)')
 param foundrySkuName string
 
@@ -160,6 +169,9 @@ module foundry './modules/foundry.bicep' = if (deployFoundry) {
     deploymentName: foundryDeploymentName
     modelName: foundryModelName
     modelVersion: foundryModelVersion
+    embeddingDeploymentName: foundryEmbeddingDeploymentName
+    embeddingModelName: foundryEmbeddingModelName
+    embeddingModelVersion: foundryEmbeddingModelVersion
   }
 }
 
@@ -206,6 +218,7 @@ output provisionedCosmosMaxRU int = cosmosProvisioned.outputs.maxAutoScaleRU
 output aiFoundryEndpoint string = deployFoundry ? foundry!.outputs.endpoint : ''
 output aiFoundryProjectName string = deployFoundry ? foundry!.outputs.projectName : ''
 output chatDeploymentName string = deployFoundry ? foundry!.outputs.deploymentName : ''
+output embeddingDeploymentName string = deployFoundry ? foundry!.outputs.embeddingDeploymentName : ''
 #disable-next-line outputs-should-not-contain-secrets
 output aiFoundryPrimaryKey string = deployFoundry ? foundry!.outputs.primaryKey : ''
 output vmPublicIp string = networking.outputs.publicIpFqdn

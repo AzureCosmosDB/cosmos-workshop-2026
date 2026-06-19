@@ -5,9 +5,7 @@ targetScope = 'resourceGroup'
 param accountName string
 param location string
 param common object
-param autoScaleSmallMaxRU int = 1000
-// Make containers for partitioning demo large enough to allow physical partitioning
-param autoScaleMaxRU int = 10000
+param autoScaleMaxRU int = 4000
 
 resource dbAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
   name: accountName
@@ -36,7 +34,7 @@ resource dbAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
 
 // ====== Modeling DB ======
 // Used for lab: Data Modeling
-// Provisioned throughput is used here so monitor reports per-partition RU consumption
+// Provisioned throughput is used here to compare per-partition RU consumption
 
 resource modelingDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-11-15' = {
   name: 'Modeling'
@@ -44,12 +42,6 @@ resource modelingDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@20
   properties: {
     resource: {
       id: 'Modeling'
-    }
-    // Mix of database and container level throughput
-    options: {
-      autoscaleSettings: {
-        maxThroughput: autoScaleSmallMaxRU
-      }
     }
   }
 }
@@ -61,7 +53,7 @@ resource ordersHotContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/
     resource: {
       id: 'OrdersHot'
       partitionKey: {
-        paths: ['/customerId']
+        paths: ['/orderDate']
         kind: 'Hash'
       }
       indexingPolicy: {
@@ -101,28 +93,6 @@ resource ordersCompositeContainer 'Microsoft.DocumentDB/databaseAccounts/sqlData
     options: {
       autoscaleSettings: {
         maxThroughput: autoScaleMaxRU
-      }
-    }
-  }
-}
-
-resource eventsTtlContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = {
-  name: 'EventsTtl'
-  parent: modelingDatabase
-  properties: {
-    resource: {
-      id: 'EventsTtl'
-      partitionKey: {
-        paths: ['/partitionKey']
-        kind: 'Hash'
-      }
-      // 30 days
-      defaultTtl: 2592000
-      indexingPolicy: {
-        indexingMode: 'consistent'
-        includedPaths: [
-          { path: '/*' }
-        ]
       }
     }
   }

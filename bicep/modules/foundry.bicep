@@ -25,6 +25,15 @@ param modelName string
 @description('Chat model version')
 param modelVersion string
 
+@description('Embedding model deployment name')
+param embeddingDeploymentName string
+
+@description('Embedding model name (e.g. text-embedding-3-small)')
+param embeddingModelName string
+
+@description('Embedding model version')
+param embeddingModelVersion string
+
 resource aiFoundryAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   name: accountName
   location: location
@@ -58,12 +67,12 @@ resource chatModelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2
   parent: aiFoundryAccount
   name: deploymentName
   sku: {
-    name: 'GlobalStandard'
+    name: 'Standard'
     capacity: 1
   }
   properties: {
     model: {
-      format: 'Microsoft'
+      format: 'OpenAI'
       name: modelName
       version: modelVersion
     }
@@ -71,8 +80,30 @@ resource chatModelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2
   }
 }
 
+// Deploy serially after the chat model to avoid concurrent deployment limit
+resource embeddingModelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
+  parent: aiFoundryAccount
+  name: embeddingDeploymentName
+  sku: {
+    name: 'Standard'
+    capacity: 1
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: embeddingModelName
+      version: embeddingModelVersion
+    }
+    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+  }
+  dependsOn: [
+    chatModelDeployment
+  ]
+}
+
 output endpoint string = aiFoundryAccount.properties.endpoint
 output projectName string = aiFoundryProject.name
 output deploymentName string = chatModelDeployment.name
+output embeddingDeploymentName string = embeddingModelDeployment.name
 #disable-next-line outputs-should-not-contain-secrets
 output primaryKey string = aiFoundryAccount.listKeys().key1

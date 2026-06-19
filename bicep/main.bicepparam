@@ -1,9 +1,9 @@
 using './main.bicep'
 
 param envName = 'lab'
-param location = 'westus2'
-param resourceGroupName = 'lab-dev1'
-param fabricRegion = 'westus2'
+param location = 'westus'
+param resourceGroupName = 'lab-dev4'
+param fabricRegion = 'westus'
 param fabricSkuName = 'F2'
 param deployFabric = true
 param deployFoundry = true
@@ -14,10 +14,13 @@ param vmAdminUsername = 'lab_user1'
 param vmAdminPassword = '*****TODO*****'
 param vmComputerName = 'bc-cosmos-lab-t'
 param applyVmSecurityType = false
-param vmSize = 'Standard_D2as_v5'
-param foundryDeploymentName = 'phi4mini'
-param foundryModelName = 'Phi-4-mini-reasoning'
-param foundryModelVersion = '1'
+param vmSize = 'Standard_D2s_v3'
+param foundryDeploymentName = 'gpt41'
+param foundryModelName = 'gpt-4.1-mini'
+param foundryModelVersion = '2025-04-14'
+param foundryEmbeddingDeploymentName = 'textembedding3small'
+param foundryEmbeddingModelName = 'text-embedding-3-small'
+param foundryEmbeddingModelVersion = '1'
 param foundrySkuName = 'S0'
 param aiFoundryProjectName = 'defaultproject'
 param tags = {

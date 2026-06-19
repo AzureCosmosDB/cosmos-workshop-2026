@@ -27,7 +27,6 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
     capabilities: [
       { name: 'EnableServerless' }
       { name: 'EnableNoSQLVectorSearch' }
-      { name: 'EnableFullTextSearch' }
     ]
     consistencyPolicy: {
       defaultConsistencyLevel: 'Session'
@@ -52,26 +51,6 @@ resource conversationsDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabas
   properties: {
     resource: {
       id: 'Conversations'
-    }
-  }
-}
-
-resource sessionsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = {
-  name: 'Sessions'
-  parent: conversationsDatabase
-  properties: {
-    resource: {
-      id: 'Sessions'
-      partitionKey: {
-        paths: ['/userId']
-        kind: 'Hash'
-      }
-      indexingPolicy: {
-        indexingMode: 'consistent'
-        includedPaths: [
-          { path: '/*' }
-        ]
-      }
     }
   }
 }
@@ -248,6 +227,85 @@ resource itemsCustomIndexContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDat
     }
   }
 }
+
+// ========== LAB 1E: DATA MODELING — REFERENCE (NORMALIZED) DATABASE ==========
+
+resource modelingReferenceDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-11-15' = {
+  name: 'ModelingReference'
+  parent: cosmosAccount
+  properties: {
+    resource: {
+      id: 'ModelingReference'
+    }
+  }
+}
+
+var modelingReferenceContainerNames = [
+  'Customers'
+  'Addresses'
+  'ProductCategories'
+  'Products'
+  'Orders'
+  'OrderItems'
+]
+
+resource modelingReferenceContainers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = [for name in modelingReferenceContainerNames: {
+  name: name
+  parent: modelingReferenceDatabase
+  properties: {
+    resource: {
+      id: name
+      partitionKey: {
+        paths: ['/partitionKey']
+        kind: 'Hash'
+      }
+      indexingPolicy: {
+        indexingMode: 'consistent'
+        includedPaths: [
+          { path: '/*' }
+        ]
+      }
+    }
+  }
+}]
+
+// ========== LAB 1E: DATA MODELING — EMBED (DENORMALIZED) DATABASE ==========
+
+resource modelingEmbedDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-11-15' = {
+  name: 'ModelingEmbed'
+  parent: cosmosAccount
+  properties: {
+    resource: {
+      id: 'ModelingEmbed'
+    }
+  }
+}
+
+var modelingEmbedContainerNames = [
+  'Customers'
+  'Products'
+  'Orders'
+]
+
+resource modelingEmbedContainers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = [for name in modelingEmbedContainerNames: {
+  name: name
+  parent: modelingEmbedDatabase
+  properties: {
+    resource: {
+      id: name
+      partitionKey: {
+        paths: ['/partitionKey']
+        kind: 'Hash'
+      }
+      indexingPolicy: {
+        indexingMode: 'consistent'
+        includedPaths: [
+          { path: '/*' }
+        ]
+      }
+    }
+  }
+}]
 
 output endpoint string = cosmosAccount.properties.documentEndpoint
 #disable-next-line outputs-should-not-contain-secrets

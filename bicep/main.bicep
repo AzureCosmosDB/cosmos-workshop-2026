@@ -59,6 +59,15 @@ param foundryModelName string
 @description('Azure AI Foundry chat model version')
 param foundryModelVersion string
 
+@description('Azure AI Foundry embedding model deployment name')
+param foundryEmbeddingDeploymentName string
+
+@description('Azure AI Foundry embedding model name (e.g. text-embedding-3-small)')
+param foundryEmbeddingModelName string
+
+@description('Azure AI Foundry embedding model version')
+param foundryEmbeddingModelVersion string
+
 @description('Azure AI Foundry account SKU (S0 = standard)')
 param foundrySkuName string
 
@@ -96,6 +105,9 @@ module lab './main.resources.bicep' = {
     foundryDeploymentName: foundryDeploymentName
     foundryModelName: foundryModelName
     foundryModelVersion: foundryModelVersion
+    foundryEmbeddingDeploymentName: foundryEmbeddingDeploymentName
+    foundryEmbeddingModelName: foundryEmbeddingModelName
+    foundryEmbeddingModelVersion: foundryEmbeddingModelVersion
     foundrySkuName: foundrySkuName
     aiFoundryProjectName: aiFoundryProjectName
     tags: tags
@@ -116,6 +128,7 @@ output provisionedCosmosMaxRU int = lab.outputs.provisionedCosmosMaxRU
 output aiFoundryEndpoint string = lab.outputs.aiFoundryEndpoint
 output aiFoundryProjectName string = lab.outputs.aiFoundryProjectName
 output chatDeploymentName string = lab.outputs.chatDeploymentName
+output embeddingDeploymentName string = lab.outputs.embeddingDeploymentName
 #disable-next-line outputs-should-not-contain-secrets
 output aiFoundryPrimaryKey string = lab.outputs.aiFoundryPrimaryKey
 output vmPublicIp string = lab.outputs.vmPublicIp

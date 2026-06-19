@@ -35,6 +35,7 @@ var vmPropertiesBase = {
     vmSize: vmSize
   }
   storageProfile: {
+    diskControllerType: 'SCSI'
     osDisk: {
       createOption: 'fromImage'
       managedDisk: {
