@@ -25,11 +25,7 @@ Before starting, confirm:
 
 ---
 
-### Step 2: Mirror the `Messages` container (or reuse the 3B mirror)
-
-If you already mirrored `Messages` as part of Lab 3B and **Replication status** still reads **Running**, skip to Step 3.
-
-Otherwise, set up the mirror:
+### Step 2: Mirror the `Messages` container
 
 1. In the workspace, click **+ New item**.
 2. Search for and select **Mirrored Azure Cosmos DB for NoSQL**.
