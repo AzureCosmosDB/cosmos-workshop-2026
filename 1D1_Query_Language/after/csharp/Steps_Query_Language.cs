@@ -92,7 +92,6 @@ public class Steps_Query_Language
     #endregion
 
     #region Step 2
-    // STUDENT EXERCISE: Students should fill in the QueryDefinition parameter and verify the output shows 3 fruit items (Apples, Bananas, Dates).
     public async Task Step2()
     {
         if (_container is null) throw new InvalidOperationException("Run Init() first.");
@@ -158,7 +157,6 @@ public class Steps_Query_Language
     #endregion
 
     #region Step 4
-    // STUDENT EXERCISE: Students should set limit to 3 and verify the output shows top 3 items by price descending.
     public async Task Step4()
     {
         if (_container is null) throw new InvalidOperationException("Run Init() first.");
@@ -195,7 +193,7 @@ public class Steps_Query_Language
     {
         if (_container is null) throw new InvalidOperationException("Run Init() first.");
 
-        Console.WriteLine("\n=== JSON properties + system functions ===");
+        Console.WriteLine("\n=== JSON properties + system functions (STUDENT EXERCISE) ===");
         Console.WriteLine("Filter on a nested property and an array tag, project with CONCAT().\n");
 
         var query = new QueryDefinition(
@@ -224,7 +222,7 @@ public class Steps_Query_Language
     {
         if (_container is null) throw new InvalidOperationException("Run Init() first.");
 
-        Console.WriteLine("\n=== Subquery over a nested array ===");
+        Console.WriteLine("\n=== Subquery over a nested array (STUDENT EXERCISE) ===");
         Console.WriteLine("Use a subquery to count vitamins per item.\n");
 
         var query = new QueryDefinition(

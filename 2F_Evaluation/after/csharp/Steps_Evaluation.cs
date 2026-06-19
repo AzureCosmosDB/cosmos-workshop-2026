@@ -22,18 +22,24 @@ public class Steps_Evaluation
     public string? FoundryEndpoint { get; private set; }
     public string? CompletionsModel { get; private set; }
     public string? EvalModel { get; private set; }
-    public List<Dictionary<string, string>>? _evalDataset { get; private set; }
-    public List<int>? _scores { get; private set; }
 
-    private CosmosClient CreateCosmosClient(string endpoint)
+    public List<int> ConsoleOutput { get; private set; } = new();
+
+    private static readonly List<Dictionary<string, string>> EvalDataset = new()
     {
-        var credential = new DefaultAzureCredential();
-
-        return new CosmosClient(endpoint, credential, new CosmosClientOptions
-        {
-            SerializerOptions = new CosmosSerializationOptions { PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase }
-        });
-    }
+        new Dictionary<string, string> {
+            { "question", "What is Azure Cosmos DB?" },
+            { "ground_truth", "Azure Cosmos DB is a globally distributed, multi-model database service from Microsoft." }
+        },
+        new Dictionary<string, string> {
+            { "question", "What types of indexes does Cosmos DB support?" },
+            { "ground_truth", "Range, spatial, composite, vector, and full-text indexes." }
+        },
+        new Dictionary<string, string> {
+            { "question", "How do vector indexes differ from range indexes?" },
+            { "ground_truth", "Vector indexes enable semantic similarity search on embeddings, while range indexes optimize numeric/string equality and ordering queries." }
+        }
+    };
     #endregion
 
     #region Init
@@ -57,9 +63,6 @@ public class Steps_Evaluation
         Container = DB.GetContainer(ContainerName);
         Endpoint = cosmosEndpoint;
 
-        // Chat completions: Foundry endpoint, Entra ID auth.
-        // This lab focuses on LLM-as-judge scoring; the retrieval side is mocked
-        // with a plain SELECT (see GenerateResponse), so no embeddings client.
         OpenAIClient = new AzureOpenAIClient(new Uri(foundryEndpoint), credential);
         FoundryEndpoint = foundryEndpoint;
 
@@ -129,29 +132,11 @@ public class Steps_Evaluation
     #region Step 1
     public void CreateEvalDataset()
     {
-        Console.WriteLine("\n=== Step 1: Create evaluation dataset (STUDENT EXERCISE) ===\n");
+        Console.WriteLine("\n=== Step 1: Create evaluation dataset (Prebuilt) ===\n");
 
-        Console.WriteLine("TODO: Add more test cases to the evaluation dataset");
+        Console.WriteLine($"Created {EvalDataset.Count} evaluation examples:");
 
-        var evalDataset = new List<Dictionary<string, string>>
-        {
-            new Dictionary<string, string> {
-                { "question", "What is Azure Cosmos DB?" },
-                { "ground_truth", "Azure Cosmos DB is a globally distributed, multi-model database service from Microsoft." }
-            },
-            new Dictionary<string, string> {
-                { "question", "What types of indexes does Cosmos DB support?" },
-                { "ground_truth", "Range, spatial, composite, vector, and full-text indexes." }
-            },
-            new Dictionary<string, string> {
-                { "question", "How do vector indexes differ from range indexes?" },
-                { "ground_truth", "Vector indexes enable semantic similarity search on embeddings, while range indexes optimize numeric/string equality and ordering queries." }
-            }
-        };
-
-        Console.WriteLine($"Created {evalDataset.Count} evaluation examples:");
-
-        foreach (var example in evalDataset)
+        foreach (var example in EvalDataset)
         {
             Console.WriteLine($"  Q: {example["question"]}");
             Console.WriteLine($"  Ground truth: {example["ground_truth"]}\n");
@@ -162,29 +147,13 @@ public class Steps_Evaluation
     #region Step 2
     public async Task ScoreOutputs()
     {
-        Console.WriteLine("\n=== Step 2: Score RAG outputs (STUDENT EXERCISE) ===\n");
+        Console.WriteLine("\n=== Step 2: Score RAG outputs ===\n");
 
         Console.WriteLine("Scoring answers using LLM-as-judge pattern...\n");
 
-        var evalDataset = new List<Dictionary<string, string>>
-        {
-            new Dictionary<string, string> {
-                { "question", "What is Azure Cosmos DB?" },
-                { "ground_truth", "Azure Cosmos DB is a globally distributed, multi-model database service from Microsoft." }
-            },
-            new Dictionary<string, string> {
-                { "question", "What types of indexes does Cosmos DB support?" },
-                { "ground_truth", "Range, spatial, composite, vector, and full-text indexes." }
-            },
-            new Dictionary<string, string> {
-                { "question", "How do vector indexes differ from range indexes?" },
-                { "ground_truth", "Vector indexes enable semantic similarity search on embeddings, while range indexes optimize numeric/string equality and ordering queries." }
-            }
-        };
-
         var scores = new List<int>();
 
-        foreach (var example in evalDataset)
+        foreach (var example in EvalDataset)
         {
             var answer = await GenerateResponse(example["question"]);
 
@@ -236,8 +205,6 @@ public class Steps_Evaluation
 
         ConsoleOutput = scores;
     }
-
-    public List<int> ConsoleOutput { get; private set; } = new();
     #endregion
 
     #region Step 3
@@ -253,25 +220,6 @@ public class Steps_Evaluation
             Console.WriteLine($"Average relevance score: {avg:F2}/5");
             Console.WriteLine("Recommendation: score >4 = good, 3-4 = needs improvement, <3 = redesign RAG pipeline");
         }
-
-        Console.WriteLine("\n=== COMPLETE ===");
-    }
-    #endregion
-
-    #region Step 5
-    public async Task Step5()
-    {
-        Console.WriteLine("\n=== Step 5: Summarize Results ===");
-
-        if (_scores is null || _scores.Count == 0)
-        {
-            Console.WriteLine("No scores available. Run Step 3 and Step 4 first.");
-            return;
-        }
-
-        var avg = (double)_scores.Sum() / _scores.Count;
-        Console.WriteLine($"Average relevance score: {avg:F2}/5");
-        Console.WriteLine("Recommendation: score >4 = good, 3-4 = needs improvement, <3 = redesign RAG pipeline");
 
         Console.WriteLine("\n=== COMPLETE ===");
     }

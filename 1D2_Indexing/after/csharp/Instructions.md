@@ -9,11 +9,8 @@ The lab uses a single project in the `1D2_Indexing` directory. Running `dotnet r
 
 ## Prerequisites
 
-You must have .NET 10 installed:
-
-```bash
-dotnet --version
-```
+- .NET 10 SDK
+- `COSMOS_ENDPOINT` environment variable set to your Cosmos DB account endpoint
 
 The `ItemsDefaultIndex` and `ItemsCustomIndex` containers in the `WorkshopData` database are deployed in advance by the workshop Bicep template (`CosmosLabs2026/bicep/modules/cosmosdb.bicep`). Cosmos DB AAD tokens only authorize data-plane operations, so the lab inspects existing containers rather than creating them.
 
@@ -51,11 +48,14 @@ Reads `ItemsDefaultIndex` and prints its indexing mode and paths. With default i
 
 ### Step 2: Inspect Custom Indexing Container (STUDENT EXERCISE)
 
-Read `ItemsCustomIndex` and verify that `/largeBlob/*` and `/metadata/*` appear in `ExcludedPaths`.
+Replace the placeholder `excluded` list in `Steps_Indexing.cs` Step 2 with a real read of the custom container's `IndexingPolicy`:
 
-**Student task**: Use `GetContainer(...).ReadContainerAsync()` to fetch the `IndexingPolicy` and check the excluded paths.
+```csharp
+var props = await container.ReadContainerAsync();
+var excluded = props.Resource.IndexingPolicy.ExcludedPaths.Select(p => p.Path).ToList();
+```
 
-**Expected output**: Both `/largeBlob/*` and `/metadata/*` listed; "Custom indexing policy verified."
+**Expected output**: Both `/largeBlob/?` and `/metadata/*` listed; "Custom indexing policy verified."
 
 ### Step 3: RU Comparison — `largeBlob` only (`?` exclusion)
 

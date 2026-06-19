@@ -204,18 +204,20 @@ public class Steps_Data_Modeling
     }
     #endregion
 
-    #region Step 2 — Embed model: one read returns the whole order
+    #region Step 2 — Embed model: one read returns the whole order (STUDENT EXERCISE)
     public async Task Step2()
     {
         if (EmbedDB is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
-        Console.WriteLine("\n=== Step 2: Fetch a Complete Order — EMBED Model ===\n");
+        Console.WriteLine("\n=== Step 2: Fetch a Complete Order — EMBED Model (STUDENT EXERCISE) ===\n");
         Console.WriteLine("Customer snapshot and line items are already on the order doc — one point read returns everything.\n");
 
         const string targetOrderId = "order_001";
         var orders = EmbedDB.GetContainer("Orders");
 
-        var resp = await orders.ReadItemAsync<OrderDocument>(targetOrderId, Pk);
+        // STUDENT EXERCISE: replace the placeholder below with a single ReadItemAsync<OrderDocument>
+        // call for targetOrderId in the embed Orders container. See Instructions.md Step 2.
+        var resp = new { Resource = new OrderDocument { Id = "(placeholder)" }, RequestCharge = 0.0 };
         var order = resp.Resource;
 
         Console.WriteLine($"  Read Orders/{order.Id}                              {resp.RequestCharge,5:F2} RU");

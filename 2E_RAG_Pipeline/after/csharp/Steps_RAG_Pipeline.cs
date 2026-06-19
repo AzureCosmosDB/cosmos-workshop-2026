@@ -111,7 +111,7 @@ public class Steps_RAG_Pipeline
     #region Step 1
     public Task Step1()
     {
-        Console.WriteLine("\n=== Step 1: Text Chunking and Seed Documents ===\n");
+        Console.WriteLine("\n=== Step 1: Text Chunking and Seed Documents (Prebuilt) ===\n");
 
         foreach (var doc in SampleDocs)
         {
@@ -160,7 +160,7 @@ public class Steps_RAG_Pipeline
     {
         if (Container is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
 
-        Console.WriteLine("\n=== Step 2: Embed and Store Chunks (STUDENT EXERCISE) ===\n");
+        Console.WriteLine("\n=== Step 2: Embed and Store Chunks (Prebuilt) ===\n");
 
         foreach (var doc in SampleDocs)
         {

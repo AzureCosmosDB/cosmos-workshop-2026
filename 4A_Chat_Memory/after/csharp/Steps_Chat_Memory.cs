@@ -122,7 +122,7 @@ public class Steps_Chat_Memory
     #region Step 2
     public async Task Step2()
     {
-        Console.WriteLine("\n=== Step 2: Chat store message schema ===");
+        Console.WriteLine("\n=== Step 2: Chat store message schema (Prebuilt) ===");
 
         var sampleChatStoreMessage = new ChatStoreMessage(
             Id: "chat_20260524_001",

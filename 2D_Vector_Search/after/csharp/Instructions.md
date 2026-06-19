@@ -9,39 +9,19 @@ The lab uses a single project in the `2D_Vector_Search` directory. Running `dotn
 
 ## Prerequisites
 
-You must have .NET 10 installed and Azure OpenAI configured with embeddings capability.
+- .NET 10 SDK
+- Azure OpenAI configured with embeddings capability
+- Environment variables: `COSMOS_ENDPOINT`, `EMBEDDINGS_ENDPOINT`, `EMBEDDINGS_KEY`, `EMBEDDINGS_MODEL` (optional)
 
-```bash
-dotnet --version
-```
+Embeddings go through a separate Azure OpenAI resource with API key auth (the v1 embeddings surface does not yet support Entra ID).
 
-## Setup
-
-1. Open a terminal in the `2D_Vector_Search` directory:
-
-   ```bash
-   cd 2D_Vector_Search
-   ```
-
-Chat completions go through an Azure AI Foundry endpoint with Entra ID auth. Embeddings go through a separate Azure OpenAI resource with API key auth (the v1 embeddings surface does not yet support Entra ID).
-
-2. Set required environment variables:
-
-   ```bash
-   export COSMOS_ENDPOINT="https://YOUR_ACCOUNT.documents.azure.com:443"
-   export FOUNDRY_ENDPOINT="https://YOUR_FOUNDRY.openai.azure.com"
-   export EMBEDDINGS_ENDPOINT="https://YOUR_EMBEDDINGS.openai.azure.com"
-   export EMBEDDINGS_KEY="YOUR_EMBEDDINGS_KEY"
-   export EMBEDDINGS_MODEL="text-embedding-3-small"  # optional
-   ```
-
-## Vector Search Operations
-
-Run the project. It executes each step in order, pausing for **Enter** between steps:
+## Run the lab
 
 ```bash
 dotnet run
 ```
+
+The program executes each step in order, pausing for **Enter** between steps.
 
 ### Step 0: Initialize Connection
 
@@ -53,13 +33,30 @@ Creates 3 sample documents, generates embeddings for them using Azure OpenAI, an
 
 ### Step 2: Vector Search (STUDENT EXERCISE)
 
-Write a vector similarity search query using the `VectorDistance` function.
+Replace the placeholder `vectorQuery` string in `Steps_Vector_Search.cs` Step 2 with a `VectorDistance` query that returns the top 2 most-similar docs:
 
-**Expected output**: Top 2 documents most similar to your search query.
+```csharp
+var vectorQuery = """
+    SELECT TOP 2 c.id, c.title, c.text, VectorDistance(c.embedding, @emb) AS score
+    FROM c
+    WHERE c.partitionKey = 'docs'
+    ORDER BY VectorDistance(c.embedding, @emb)
+    """;
+```
+
+**Expected output**: Top 2 documents most similar to "cosmos db vector search" with their scores.
 
 ### Step 3: Full-Text Search (STUDENT EXERCISE)
 
-Write a full-text search query using `FullTextContains`.
+Replace the placeholder `ftsQuery` in `Steps_Vector_Search.cs` Step 3 with a `FullTextContains` query:
+
+```csharp
+var ftsQuery = new QueryDefinition(
+    "SELECT * FROM c WHERE FullTextContains(c.text, @search) AND c.partitionKey = 'docs'")
+    .WithParameter("@search", searchText);
+```
+
+**Expected output**: Documents whose `text` matches `"cosmos db"`.
 
 ## Lab Complete!
 

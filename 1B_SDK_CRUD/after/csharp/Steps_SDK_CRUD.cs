@@ -53,6 +53,7 @@ public class Steps_SDK_CRUD
         Console.WriteLine("\n=== Step 1: Create an Item ===\n");
 
         var itemId = Guid.NewGuid().ToString();
+        _itemId = itemId;
         Console.WriteLine($"  creating item with id: {itemId}");
 
         var item = new CatalogItem
@@ -75,13 +76,10 @@ public class Steps_SDK_CRUD
                 new PartitionKey("workshop"));
 
             Console.WriteLine($"  created item: {response.Resource.Id}\n");
-
-            _itemId = itemId;
         }
         catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
         {
             Console.WriteLine($"  item {itemId} already exists in container\n");
-            _itemId = itemId;
         }
         catch (Exception ex)
         {
@@ -96,8 +94,7 @@ public class Steps_SDK_CRUD
         if (_container is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
         if (string.IsNullOrEmpty(_itemId)) throw new InvalidOperationException("Item not created yet. Run Step 1 first.");
 
-        Console.WriteLine("\n=== Step 2: Read an Item ===");
-        Console.WriteLine("*** STUDENT EXERCISE - Complete this step ***\n");
+        Console.WriteLine("\n=== Step 2: Read an Item ===\n");
 
         var itemId = _itemId!;
         Console.WriteLine($"  reading item with id: {itemId}");
@@ -136,7 +133,7 @@ public class Steps_SDK_CRUD
         var item = new CatalogItem
         {
             Id = itemId,
-            Name = "Cosmic Item #1",
+            Name = "Store Item #1",
             Category = "workshop",
             PartitionKey = "workshop",
             Data = new CatalogItemData

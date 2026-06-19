@@ -9,11 +9,8 @@ The lab uses a single project in the `1D1_Query_Language` directory. Running `do
 
 ## Prerequisites
 
-You must have .NET 10 installed:
-
-```bash
-dotnet --version
-```
+- .NET 10 SDK
+- `COSMOS_ENDPOINT` environment variable set to your Cosmos DB account endpoint
 
 ## Setup
 
@@ -23,20 +20,11 @@ dotnet --version
    cd 1D1_Query_Language
    ```
 
-2. Set required environment variables:
+2. Run the project. It executes each step in order, pausing for **Enter** between steps:
 
    ```bash
-   export COSMOS_ENDPOINT="https://YOUR_ACCOUNT.documents.azure.com:443"
-   export COSMOS_TENANT_ID="YOUR_TENANT_ID"  # optional
+   dotnet run
    ```
-
-## Query Operations
-
-Run the project. It executes each step in order, pausing for **Enter** between steps:
-
-```bash
-dotnet run
-```
 
 ### Step 0: Initialize Connection
 
@@ -48,7 +36,12 @@ Seeds 5 fruit/vegetable items into the container with grocery partition key. Eac
 
 ### Step 2: Query for All Fruits (STUDENT EXERCISE)
 
-Write a query to find all items where `category == "fruit"`.
+Replace the placeholder `QueryDefinition` in `Steps_Query_Language.cs` Step 2 with a parameterized query that returns items where `c.category` matches `categoryToQuery`:
+
+```csharp
+var query = new QueryDefinition("SELECT * FROM c WHERE c.category = @cat")
+    .WithParameter("@cat", categoryToQuery);
+```
 
 **Expected output**: Apples, Bananas, and Dates are listed with prices.
 
@@ -58,15 +51,41 @@ Fetches the same single item (`id = "1"`) two ways — a point read and a `SELEC
 
 ### Step 4: Parameterized Query (STUDENT EXERCISE)
 
-Write a parameterized query to get the top N items by price in descending order.
+Replace the placeholder `QueryDefinition` in `Steps_Query_Language.cs` Step 4 with a parameterized `SELECT TOP @limit` query ordered by price descending:
 
-### Step 5: JSON Properties + System Functions
+```csharp
+var topQuery = new QueryDefinition("SELECT TOP @limit c.name, c.price FROM c ORDER BY c.price DESC")
+    .WithParameter("@limit", limit);
+```
 
-Demonstrates Cosmos DB's native JSON support and two built-in [system functions](https://learn.microsoft.com/azure/cosmos-db/nosql/query/system-functions): filters on a nested property (`c.nutrition.calories`) and an array tag (`ARRAY_CONTAINS(c.tags, 'organic')`), and projects `CONCAT(c.category, ' category')`.
+**Expected output**: 3 items listed by price (highest first).
 
-### Step 6: Subquery Over a Nested Array
+### Step 5: JSON Properties + System Functions (STUDENT EXERCISE)
 
-Demonstrates a [subquery](https://learn.microsoft.com/azure/cosmos-db/nosql/query/subquery) that iterates the nested `nutrition.vitamins` array per item and projects a `COUNT(1)`.
+Replace the placeholder `QueryDefinition` in `Steps_Query_Language.cs` Step 5 with a query that uses Cosmos DB's native JSON support and two built-in [system functions](https://learn.microsoft.com/azure/cosmos-db/nosql/query/system-functions) — filters on a nested property (`c.nutrition.calories`) and an array tag (`ARRAY_CONTAINS(c.tags, 'organic')`), and projects `CONCAT(c.category, ' category')`:
+
+```csharp
+var query = new QueryDefinition(
+    "SELECT c.name, CONCAT(c.category, ' category') AS category, c.nutrition.calories " +
+    "FROM c " +
+    "WHERE ARRAY_CONTAINS(c.tags, 'organic') AND c.nutrition.calories < 100");
+```
+
+**Expected output**: Apples and Carrots — the organic items under 100 calories.
+
+### Step 6: Subquery Over a Nested Array (STUDENT EXERCISE)
+
+Replace the placeholder `QueryDefinition` in `Steps_Query_Language.cs` Step 6 with a [subquery](https://learn.microsoft.com/azure/cosmos-db/nosql/query/subquery) that iterates the nested `nutrition.vitamins` array per item and projects a `COUNT(1)`:
+
+```csharp
+var query = new QueryDefinition(
+    "SELECT c.name, " +
+    "       (SELECT VALUE COUNT(1) FROM v IN c.nutrition.vitamins) AS vitaminCount " +
+    "FROM c " +
+    "ORDER BY c.name");
+```
+
+**Expected output**: each item listed with its count of vitamins from `nutrition.vitamins`.
 
 ## Lab Complete!
 

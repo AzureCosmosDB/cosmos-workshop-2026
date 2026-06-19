@@ -9,11 +9,8 @@ The lab uses a single project in the `4A_Chat_Memory` directory. Running `dotnet
 
 ## Prerequisites
 
-You must have .NET 10 installed:
-
-```bash
-dotnet --version
-```
+- .NET 10 SDK
+- Environment variables: `COSMOS_ENDPOINT`, `FOUNDRY_ENDPOINT`, `EMBEDDINGS_ENDPOINT`, `EMBEDDINGS_KEY`, `COMPLETIONS_MODEL`, `EMBEDDINGS_MODEL`
 
 The Cosmos DB account must have the following pre-provisioned:
 
@@ -59,26 +56,39 @@ Loads `rag_seed_docs.json`, embeds each document, and upserts it into `WorkshopD
 
 **Expected output**: One `Seeded: <title>` line per document, followed by a total count.
 
-### Step 2: Chat Store Message Schema (STUDENT EXERCISE)
+### Step 2: Chat Store Message Schema (Prebuilt)
 
-Define the JSON shape used for every chat turn and write a helper that persists turns to `Conversations/Messages`. The `metadata` object carries fields that will be queried in T-SQL in Fabric in Lab 4B (model, latency, token usage, RAG hits, retrieved doc IDs).
+Prints a sample `ChatStoreMessage` so you can see the JSON shape used for every chat turn, then writes a user turn and an assistant turn via the `SaveChatTurn` helper. The `metadata` object carries fields that will be queried in T-SQL in Fabric in Lab 4B (model, latency, token usage, RAG hits, retrieved doc IDs).
 
 **Expected output**: A sample message printed as JSON, followed by confirmation that a user turn and an assistant turn were saved to Cosmos.
 
 ### Step 3: Retrieve Recent Messages and Run a Vector Search (STUDENT EXERCISE)
 
-Two reads underpin the chat agent: pulling the last N turns for conversational context, and pulling the top-K RAG hits for grounding.
+Two reads underpin the chat agent: pulling the last N turns for conversational context, and pulling the top-K RAG hits for grounding. The vector search (`RetrieveRelevant`) is prebuilt — your job is the conversational read.
 
-- `GetRecentMessages` queries `Messages` scoped to a single `sessionId` partition, ordered by `_ts DESC`.
-- `RetrieveRelevant` embeds the query text and runs a `VectorDistance` ORDER BY against the seeded RAG partition.
+Replace the placeholder query in `GetRecentMessages` with one scoped to the session partition and ordered by `_ts DESC`:
+
+```csharp
+var query = $@"SELECT * FROM c WHERE c.sessionId = @sessionId
+                    ORDER BY c._ts DESC OFFSET 0 LIMIT {count}";
+```
 
 **Expected output**: The recent-message count and contents from Step 2, plus three vector-search hits with their scores.
 
 ### Step 4: Build the RAG Chat Agent (STUDENT EXERCISE)
 
-Stitch the pieces together: save the user turn, pull recent history, run vector search for grounding, call the LLM, then save the assistant turn with analytics metadata (model, latency, prompt/completion/total tokens, RAG hits, retrieved doc IDs). These nested fields surface as queryable columns when the container is mirrored into Fabric in Lab 4B.
+The agent already saves the user turn, pulls recent history, runs vector search, calls the LLM, and saves the assistant turn with analytics metadata. Your job is to write the **system prompt** that grounds the model in retrieved context plus chat history.
 
-**Expected output**: A grounded answer to the seed question `"How does vector search work in Cosmos DB?"`.
+Replace the placeholder `systemContent` in `ChatAgent` with one that includes the base prompt, retrieved context, and chat history:
+
+```csharp
+var systemContent =
+    $"{baseSystemPrompt}\n\n" +
+    $"Use the following retrieved context to ground your answer:\n{contextText}\n\n" +
+    $"Chat history:\n{history}";
+```
+
+**Expected output**: A grounded answer to the seed question `"How does vector search work in Cosmos DB?"`. With the placeholder prompt, you'll see the model answer without retrieved context or history — that's the comparison point.
 
 ### Step 5: Chat with Your Agent
 

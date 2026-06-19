@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace Lab1B;
 
 public class CatalogItemData

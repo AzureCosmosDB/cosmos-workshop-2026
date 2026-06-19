@@ -5,7 +5,7 @@
 
 In this exercise you compare two data models for the same e-commerce domain — a **reference (normalized)** model that mirrors a relational schema, and an **embed (denormalized)** model designed around realistic common queries. The following steps look at partition-key choice with a hot-partition demo.
 
-The lab uses a single project in the `1E_Data_Modeling` directory. Running `dotnet run` walks through each step, pausing for **Enter** between steps. Most steps are prebuilt — two have **student exercises** marked in the code (Step 4 and Step 6).
+The lab uses a single project in the `1E_Data_Modeling` directory. Running `dotnet run` walks through each step, pausing for **Enter** between steps. Most steps are prebuilt — three have **student exercises** marked in the code (Steps 2, 4, and 6).
 
 ## Prerequisites
 
@@ -77,9 +77,15 @@ In Cosmos DB queries involve a single container, so every hop is its own round-t
 
 **Expected behavior**: 7+ round-trips, RU charge sums across all of them.
 
-## Step 2: Fetch a complete order — embed model (Prebuilt)
+## Step 2: Fetch a complete order — embed model (STUDENT EXERCISE)
 
-In the embed model the customer name/address snapshot and all line items already live inside the order document, so a single point read returns everything.
+In the embed model the customer name/address snapshot and all line items already live inside the order document, so a single point read returns everything. The contrast with Step 1's six-container walk is the whole point of the embed model — write it yourself to see how little code it takes.
+
+In `Steps_Data_Modeling.cs` Step 2, replace the placeholder `resp` with a single `ReadItemAsync<OrderDocument>` call against the embed `Orders` container:
+
+```csharp
+var resp = await orders.ReadItemAsync<OrderDocument>(targetOrderId, Pk);
+```
 
 **Expected behavior**: 1 round-trip, ~1-3 RU. Compare directly to Step 1's totals.
 
