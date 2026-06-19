@@ -42,33 +42,29 @@ dotnet run
 
 Set up the Cosmos client connection to the `WorkshopData/Catalog` container.
 
-### Step 1: Verify Connection
-
-Confirm the connection details before moving on.
-
-### Step 2: Seed Data (Prebuilt)
+### Step 1: Seed Data (Prebuilt)
 
 Seeds 5 fruit/vegetable items into the container with grocery partition key. Each item has a `tags` array and a nested `nutrition` object (`calories`, `vitamins[]`) so later steps can demonstrate JSON and subquery features.
 
-### Step 3: Query for All Fruits (STUDENT EXERCISE)
+### Step 2: Query for All Fruits (STUDENT EXERCISE)
 
 Write a query to find all items where `category == "fruit"`.
 
 **Expected output**: Apples, Bananas, and Dates are listed with prices.
 
-### Step 4: Point Read vs Query Cost
+### Step 3: Point Read vs Query Cost
 
 Fetches the same single item (`id = "1"`) two ways — a point read and a `SELECT * FROM c WHERE c.id = '1'` query — and compares their RU charges. Same logical result, two access patterns, so the RU difference is a fair head-to-head.
 
-### Step 5: Parameterized Query (STUDENT EXERCISE)
+### Step 4: Parameterized Query (STUDENT EXERCISE)
 
 Write a parameterized query to get the top N items by price in descending order.
 
-### Step 6: JSON Properties + System Functions
+### Step 5: JSON Properties + System Functions
 
 Demonstrates Cosmos DB's native JSON support and two built-in [system functions](https://learn.microsoft.com/azure/cosmos-db/nosql/query/system-functions): filters on a nested property (`c.nutrition.calories`) and an array tag (`ARRAY_CONTAINS(c.tags, 'organic')`), and projects `CONCAT(c.category, ' category')`.
 
-### Step 7: Subquery Over a Nested Array
+### Step 6: Subquery Over a Nested Array
 
 Demonstrates a [subquery](https://learn.microsoft.com/azure/cosmos-db/nosql/query/subquery) that iterates the nested `nutrition.vitamins` array per item and projects a `COUNT(1)`.
 

@@ -1,4 +1,4 @@
-// Lab 1D1: Query Language - Consolidated Steps
+// Lab 1D1: Query Language - Consolidated Steps (STUDENT VERSION)
 
 using Azure.Identity;
 using Microsoft.Azure.Cosmos;
@@ -92,7 +92,6 @@ public class Steps_Query_Language
     #endregion
 
     #region Step 2
-    // STUDENT EXERCISE: Students should fill in the QueryDefinition parameter and verify the output shows 3 fruit items (Apples, Bananas, Dates).
     public async Task Step2()
     {
         if (_container is null) throw new InvalidOperationException("Run Init() first.");
@@ -106,8 +105,9 @@ public class Steps_Query_Language
 
         string categoryToQuery = "fruit";
 
-        var query = new QueryDefinition("SELECT * FROM c WHERE c.category = @cat")
-            .WithParameter("@cat", categoryToQuery);
+        // STUDENT EXERCISE: replace the placeholder below with a parameterized query
+        // that returns items where c.category = @cat. See Instructions.md Step 2.
+        var query = new QueryDefinition("SELECT '(placeholder)' AS name, 0 AS price");
 
         var iterator = _container.GetItemQueryIterator<dynamic>(query);
         Fruits = new List<dynamic>();
@@ -158,7 +158,6 @@ public class Steps_Query_Language
     #endregion
 
     #region Step 4
-    // STUDENT EXERCISE: Students should set limit to 3 and verify the output shows top 3 items by price descending.
     public async Task Step4()
     {
         if (_container is null) throw new InvalidOperationException("Run Init() first.");
@@ -167,8 +166,9 @@ public class Steps_Query_Language
 
         int limit = 3;
 
-        var topQuery = new QueryDefinition("SELECT TOP @limit c.name, c.price FROM c ORDER BY c.price DESC")
-            .WithParameter("@limit", limit);
+        // STUDENT EXERCISE: replace the placeholder below with a parameterized query
+        // that returns the top @limit items by price descending. See Instructions.md Step 4.
+        var topQuery = new QueryDefinition("SELECT '(placeholder)' AS name, 0 AS price");
 
         var topIterator = _container.GetItemQueryIterator<dynamic>(topQuery);
         var topItems = new List<dynamic>();
@@ -195,13 +195,14 @@ public class Steps_Query_Language
     {
         if (_container is null) throw new InvalidOperationException("Run Init() first.");
 
-        Console.WriteLine("\n=== JSON properties + system functions ===");
+        Console.WriteLine("\n=== JSON properties + system functions (STUDENT EXERCISE) ===");
         Console.WriteLine("Filter on a nested property and an array tag, project with CONCAT().\n");
 
-        var query = new QueryDefinition(
-            "SELECT c.name, CONCAT(c.category, ' category') AS category, c.nutrition.calories " +
-            "FROM c " +
-            "WHERE ARRAY_CONTAINS(c.tags, 'organic') AND c.nutrition.calories < 100");
+        // STUDENT EXERCISE: replace the placeholder below with a query that selects
+        // c.name, CONCAT(c.category, ' category') AS category, c.nutrition.calories
+        // from items where ARRAY_CONTAINS(c.tags, 'organic') AND c.nutrition.calories < 100.
+        // See Instructions.md Step 5.
+        var query = new QueryDefinition("SELECT '(placeholder)' AS name, '(placeholder)' AS category, 0 AS calories");
 
         var iterator = _container.GetItemQueryIterator<dynamic>(query);
 
@@ -224,14 +225,13 @@ public class Steps_Query_Language
     {
         if (_container is null) throw new InvalidOperationException("Run Init() first.");
 
-        Console.WriteLine("\n=== Subquery over a nested array ===");
+        Console.WriteLine("\n=== Subquery over a nested array (STUDENT EXERCISE) ===");
         Console.WriteLine("Use a subquery to count vitamins per item.\n");
 
-        var query = new QueryDefinition(
-            "SELECT c.name, " +
-            "       (SELECT VALUE COUNT(1) FROM v IN c.nutrition.vitamins) AS vitaminCount " +
-            "FROM c " +
-            "ORDER BY c.name");
+        // STUDENT EXERCISE: replace the placeholder below with a query that selects
+        // c.name and a subquery COUNT over c.nutrition.vitamins as vitaminCount,
+        // ordered by c.name. See Instructions.md Step 6.
+        var query = new QueryDefinition("SELECT '(placeholder)' AS name, 0 AS vitaminCount");
 
         var iterator = _container.GetItemQueryIterator<dynamic>(query);
 
