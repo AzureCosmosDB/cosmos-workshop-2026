@@ -39,7 +39,7 @@ param vmAdminUsername string
 @secure()
 param vmAdminPassword string
 
-@description('VM size (D2ads_v5 or compatible)')
+@description('VM size (D4s_v3 or compatible)')
 param vmSize string
 
 @description('Computer name for the lab VM')
@@ -132,7 +132,7 @@ module cosmosProvisioned './modules/cosmosdb.provisioned.bicep' = {
       envName: envName
       tags: tags
     }
-    autoScaleMaxRU: 4000
+    autoScaleMaxRU: 1000
   }
 }
 
@@ -228,3 +228,8 @@ output storageAccountBlobEndpoint string = storageAccount.properties.primaryEndp
 #disable-next-line outputs-should-not-contain-secrets
 output storageAccountKey string = storageAccount.listKeys().keys[0].value
 output fabricCapacityId string = deployFabric ? fabric!.outputs.capacityId : ''
+output cosmosAccountName string = cosmosDbName
+output cosmosProvisionedAccountName string = cosmosDbProvisionedName
+output foundryAccountName string = deployFoundry ? aiFoundryName : ''
+output storageAccountName string = storageName
+output vmName string = vmName

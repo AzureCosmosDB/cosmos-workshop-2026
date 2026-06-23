@@ -41,7 +41,7 @@ param vmAdminUsername string
 @secure()
 param vmAdminPassword string
 
-@description('VM size (D2ads_v5 or compatible)')
+@description('VM size (D4s_v3 or compatible)')
 param vmSize string
 
 @description('Computer name for the lab VM')
@@ -85,6 +85,7 @@ param studentOwnerObjectId string = ''
 resource labResourceGroup 'Microsoft.Resources/resourceGroups@2025-04-01' = {
   name: resourceGroupName
   location: location
+  tags: tags
 }
 
 module lab './main.resources.bicep' = {
@@ -138,3 +139,9 @@ output storageAccountBlobEndpoint string = lab.outputs.storageAccountBlobEndpoin
 #disable-next-line outputs-should-not-contain-secrets
 output storageAccountKey string = lab.outputs.storageAccountKey
 output fabricCapacityId string = lab.outputs.fabricCapacityId
+output cosmosAccountName string = lab.outputs.cosmosAccountName
+output cosmosProvisionedAccountName string = lab.outputs.cosmosProvisionedAccountName
+output foundryAccountName string = lab.outputs.foundryAccountName
+output storageAccountName string = lab.outputs.storageAccountName
+output vmName string = lab.outputs.vmName
+output resourceGroupNameOut string = resourceGroupName

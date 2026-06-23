@@ -11,7 +11,7 @@ Before starting, confirm:
 
 - You completed **Lab 4A** and the `Messages` container in the `Conversations` database holds at least one multi-turn session. If you only have one turn, run the `chat_agent(...)` cell from 4A a few more times so there is data to aggregate.
 - The Cosmos DB account meets the Fabric mirroring requirements (already configured in the pre-deployed infrastructure): NoSQL API, continuous backup enabled, system-assigned identity enabled, and network access reachable from Fabric.
-- You can sign in to https://app.fabric.microsoft.com/ with the workshop credentials and you have access to the `CosmosWorkshop` workspace.
+- You can sign in to https://app.fabric.microsoft.com/ with the workshop credentials and you have access to the Fabric workspace for your user.
 
 ---
 
@@ -20,7 +20,7 @@ Before starting, confirm:
 ### Step 1: Open the Fabric workspace
 
 1. Navigate to https://app.fabric.microsoft.com/ and sign in with the workshop credentials.
-2. Open the pre-provisioned `CosmosWorkshop` workspace.
+2. Open the pre-provisioned workspace for your user.
 3. Confirm you can see the workspace's items list — you will create a Mirrored DB and two notebooks here.
 
 ---

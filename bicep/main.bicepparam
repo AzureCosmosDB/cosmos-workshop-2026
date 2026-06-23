@@ -12,9 +12,9 @@ param fabricAdminMembers = [
 ]
 param vmAdminUsername = 'lab_user1'
 param vmAdminPassword = '*****TODO*****'
-param vmComputerName = 'bc-cosmos-lab-t'
+param vmComputerName = 'cosmos-lab-t'
 param applyVmSecurityType = false
-param vmSize = 'Standard_D2s_v3'
+param vmSize = 'Standard_D4s_v3'
 param foundryDeploymentName = 'gpt41'
 param foundryModelName = 'gpt-4.1-mini'
 param foundryModelVersion = '2025-04-14'
