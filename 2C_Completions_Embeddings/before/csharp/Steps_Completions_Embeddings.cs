@@ -24,7 +24,7 @@ public class Steps_Completions_Embeddings
     public string? FoundryEndpoint { get; private set; }
     public string? EmbeddingsEndpoint { get; private set; }
     public string? CompletionsModel { get; private set; }
-    public string EmbeddingsModel { get; private set; } = "text-embedding-3-small";
+    public string EmbeddingsModel { get; private set; } = "textembedding3small";
     #endregion
 
     #region Init
@@ -59,8 +59,8 @@ public class Steps_Completions_Embeddings
             new System.ClientModel.ApiKeyCredential(embeddingsKey));
         EmbeddingsEndpoint = embeddingsEndpoint;
 
-        CompletionsModel = Environment.GetEnvironmentVariable("COMPLETIONS_MODEL") ?? "phi-4-mini-instruct";
-        EmbeddingsModel = Environment.GetEnvironmentVariable("EMBEDDINGS_MODEL") ?? "text-embedding-3-small";
+        CompletionsModel = Environment.GetEnvironmentVariable("COMPLETIONS_MODEL") ?? "gpt41";
+        EmbeddingsModel = Environment.GetEnvironmentVariable("EMBEDDINGS_MODEL") ?? "textembedding3small";
 
         Console.WriteLine($"  endpoint:    {cosmosEndpoint}");
         Console.WriteLine($"  database:    {DbName}");
@@ -77,7 +77,7 @@ public class Steps_Completions_Embeddings
 
         Console.WriteLine("\n=== Step 1: Chat Completions (STUDENT EXERCISE) ===\n");
 
-        var chatClient = OpenAIClient.GetChatClient(CompletionsModel ?? "phi-4-mini-instruct");
+        var chatClient = OpenAIClient.GetChatClient(CompletionsModel ?? "gpt41");
 
         var message = "Explain partitioning in Cosmos DB in 2 sentences.";
         var messages1 = new List<ChatMessage>
@@ -117,7 +117,7 @@ public class Steps_Completions_Embeddings
 
         Console.WriteLine("\n=== Step 2: Streaming response (STUDENT EXERCISE) ===\n");
 
-        var chatClient = OpenAIClient.GetChatClient(CompletionsModel ?? "phi-4-mini-instruct");
+        var chatClient = OpenAIClient.GetChatClient(CompletionsModel ?? "gpt41");
 
         var message = "List 5 Cosmos DB consistency levels and their use cases.";
         var messages2 = new List<ChatMessage>

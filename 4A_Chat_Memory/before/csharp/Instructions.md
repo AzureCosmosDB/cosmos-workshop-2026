@@ -27,24 +27,11 @@ Chat completions go through an Azure AI Foundry endpoint with Entra ID auth. Emb
    cd 4A_Chat_Memory
    ```
 
-2. Set required environment variables:
+2. Run the project. It executes each step in order, pausing for **Enter** between steps:
 
    ```bash
-   export COSMOS_ENDPOINT="https://YOUR_ACCOUNT.documents.azure.com:443"
-   export FOUNDRY_ENDPOINT="https://YOUR_FOUNDRY.openai.azure.com"
-   export EMBEDDINGS_ENDPOINT="https://YOUR_EMBEDDINGS.openai.azure.com"
-   export EMBEDDINGS_KEY="YOUR_EMBEDDINGS_KEY"
-   export COMPLETIONS_MODEL="YOUR_CHAT_DEPLOYMENT_NAME"
-   export EMBEDDINGS_MODEL="YOUR_EMBEDDINGS_DEPLOYMENT_NAME"
+   dotnet run
    ```
-
-## Running the Lab
-
-Run the project. It executes each step in order, pausing for **Enter** between steps:
-
-```bash
-dotnet run
-```
 
 ### Step 0: Initialize Connections
 

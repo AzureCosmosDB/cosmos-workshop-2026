@@ -12,7 +12,7 @@ The lab uses a single project in the `1D2_Indexing` directory. Running `dotnet r
 - .NET 10 SDK
 - `COSMOS_ENDPOINT` environment variable set to your Cosmos DB account endpoint
 
-The `ItemsDefaultIndex` and `ItemsCustomIndex` containers in the `WorkshopData` database are deployed in advance by the workshop Bicep template (`CosmosLabs2026/bicep/modules/cosmosdb.bicep`). Cosmos DB AAD tokens only authorize data-plane operations, so the lab inspects existing containers rather than creating them.
+The `ItemsDefaultIndex` and `ItemsCustomIndex` containers in the `WorkshopData` database are deployed in advance by the workshop Bicep template (`bicep/modules/cosmosdb.bicep`). Cosmos DB AAD tokens only authorize data-plane operations, so the lab inspects existing containers rather than creating them.
 
 `ItemsCustomIndex` is deployed with this policy:
 
@@ -28,7 +28,7 @@ The `ItemsDefaultIndex` and `ItemsCustomIndex` containers in the `WorkshopData` 
 }
 ```
 
-The two forms illustrate two patterns: `?` excludes the scalar value at a path (used here for a single ~100 KB string in `largeBlob`), while `*` excludes everything under a path (used here for the nested `metadata` object with ~50 fields). Step 3 writes a document combining both — the default container indexes all of it, the custom container skips both, producing the measurable RU difference.
+The two forms illustrate two patterns: `?` excludes the scalar value at a path (used here for a single ~10 KB string in `largeBlob`), while `*` excludes everything under a path (used here for the nested `metadata` object with ~50 fields). Step 3 writes a document combining both — the default container indexes all of it, the custom container skips both, producing the measurable RU difference.
 
 ## Indexing Operations
 
@@ -59,7 +59,7 @@ var excluded = props.Resource.IndexingPolicy.ExcludedPaths.Select(p => p.Path).T
 
 ### Step 3: RU Comparison — `largeBlob` only (`?` exclusion)
 
-Writes a document containing only a ~100 KB scalar string at `/largeBlob` to both containers. The custom container's `/largeBlob/?` exclusion skips indexing that single value. Shows the impact of excluding one large scalar.
+Writes a document containing only a ~10 KB scalar string at `/largeBlob` to both containers. The custom container's `/largeBlob/?` exclusion skips indexing that single value. Shows the impact of excluding one large scalar.
 
 ### Step 4: RU Comparison — `metadata` only (`*` exclusion)
 

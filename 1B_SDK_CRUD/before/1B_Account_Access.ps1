@@ -80,8 +80,6 @@ Write-Output "Cognitive Services Contributor role granted on $FOUNDRY_ACCT_NAME"
 $endpoint            = "https://$ACCT_NAME.documents.azure.com:443/"
 $endpointProvisioned = "https://$ACCT_NAME_PROVISIONED.documents.azure.com:443/"
 [System.Environment]::SetEnvironmentVariable('COSMOS_ENDPOINT',                 $endpoint,             'User')
-[System.Environment]::SetEnvironmentVariable('COSMOS_ACCOUNT_NAME',             $ACCT_NAME,            'User')
-[System.Environment]::SetEnvironmentVariable('COSMOS_ACCOUNT_NAME_PROVISIONED', $ACCT_NAME_PROVISIONED,'User')
 [System.Environment]::SetEnvironmentVariable('COSMOS_ENDPOINT_PROVISIONED',     $endpointProvisioned,  'User')
 
 Write-Output ""

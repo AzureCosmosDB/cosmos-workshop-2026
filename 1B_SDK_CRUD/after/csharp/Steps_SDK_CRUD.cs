@@ -26,7 +26,6 @@ public class Steps_SDK_CRUD
         _endpoint = cosmosEndpoint;
 
         var credential = new DefaultAzureCredential();
-        var accountName = Environment.GetEnvironmentVariable("COSMOS_ACCOUNT_NAME") ?? "unknown";
         var dbName = "WorkshopData";
         var containerName = "Catalog";
 
@@ -38,7 +37,6 @@ public class Steps_SDK_CRUD
         _container = _database.GetContainer(containerName);
 
         Console.WriteLine($"  endpoint: {_endpoint}");
-        Console.WriteLine($"  account: {accountName}");
         Console.WriteLine($"  database: {dbName}");
         Console.WriteLine($"  container: {containerName}");
         Console.WriteLine($"  connected: {_endpoint}{dbName}/{containerName}\n");

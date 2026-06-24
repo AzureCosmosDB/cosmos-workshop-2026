@@ -19,7 +19,7 @@ public class Steps_Vector_Search
     public Container? Container { get; private set; }
     public AzureOpenAIClient? EmbeddingsOpenAIClient { get; private set; }
     public string? EmbeddingsEndpoint { get; private set; }
-    public string EmbeddingsModel { get; private set; } = "text-embedding-3-small";
+    public string EmbeddingsModel { get; private set; } = "textembedding3small";
 
     private CosmosClient CreateClient(string endpoint)
     {
@@ -44,7 +44,7 @@ public class Steps_Vector_Search
         var embeddingsKey = Environment.GetEnvironmentVariable("EMBEDDINGS_KEY")
             ?? throw new InvalidOperationException("EMBEDDINGS_KEY environment variable is required.");
 
-        EmbeddingsModel = Environment.GetEnvironmentVariable("EMBEDDINGS_MODEL") ?? "text-embedding-3-small";
+        EmbeddingsModel = Environment.GetEnvironmentVariable("EMBEDDINGS_MODEL") ?? "textembedding3small";
 
         Client = CreateClient(endpoint);
         DB = Client.GetDatabase(DbName);

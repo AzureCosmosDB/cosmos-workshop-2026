@@ -71,7 +71,7 @@ var query = new QueryDefinition(
     "WHERE ARRAY_CONTAINS(c.tags, 'organic') AND c.nutrition.calories < 100");
 ```
 
-**Expected output**: Apples and Carrots — the organic items under 100 calories.
+**Expected output**: Apples, Broccoli, and Carrots — the organic items under 100 calories.
 
 ### Step 6: Subquery Over a Nested Array (STUDENT EXERCISE)
 

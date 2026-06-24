@@ -24,7 +24,7 @@ public class Steps_RAG_Pipeline
     public string? FoundryEndpoint { get; private set; }
     public string? EmbeddingsEndpoint { get; private set; }
     public string? CompletionsModel { get; private set; }
-    public string EmbeddingsModel { get; private set; } = "text-embedding-3-small";
+    public string EmbeddingsModel { get; private set; } = "textembedding3small";
 
     private EmbeddingClient? _embeddingClient;
     private ChatClient? _chatClient;
@@ -85,8 +85,8 @@ public class Steps_RAG_Pipeline
         Container = DB.GetContainer(ContainerName);
         CosmosEndpoint = cosmosEndpoint;
 
-        CompletionsModel = Environment.GetEnvironmentVariable("COMPLETIONS_MODEL") ?? "phi-4-mini-instruct";
-        EmbeddingsModel = Environment.GetEnvironmentVariable("EMBEDDINGS_MODEL") ?? "text-embedding-3-small";
+        CompletionsModel = Environment.GetEnvironmentVariable("COMPLETIONS_MODEL") ?? "gpt41";
+        EmbeddingsModel = Environment.GetEnvironmentVariable("EMBEDDINGS_MODEL") ?? "textembedding3small";
 
         // Chat completions: Foundry endpoint, Entra ID auth.
         OpenAIClient = new AzureOpenAIClient(new Uri(foundryEndpoint), new DefaultAzureCredential());

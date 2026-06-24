@@ -1,7 +1,7 @@
 # Lab 4B: Analyzing Chat History with Fabric Mirror
 
 **Time**: ~40 min
-**Environment**: Microsoft Fabric portal (browser) — SQL notebook + PySpark notebook + Power BI
+**Environment**: Microsoft Fabric portal (browser) — T-SQL notebook
 
 In this exercise you will take the conversational history written by Lab 4A and analyze it in Microsoft Fabric. Because Fabric reads from a **mirrored** copy of the `Messages` container in OneLake, every query you run here costs **zero RU** against the live Cosmos DB account — the operational agent keeps serving traffic uninterrupted while you do analytics on the same data.
 

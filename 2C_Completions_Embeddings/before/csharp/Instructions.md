@@ -1,6 +1,6 @@
 # Lab 2C: Completions + Embeddings in C#
 
-**Time**: ~30 min  
+**Time**: ~20 min  
 **Environment**: .NET 10 terminal
 
 In this exercise you will call Azure OpenAI chat completions (non-streaming and streaming) and the embeddings model, then compare two embeddings via cosine similarity.

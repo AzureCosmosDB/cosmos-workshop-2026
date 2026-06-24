@@ -65,7 +65,7 @@ Self directed VM and account setup steps for students can be found in [StudentEn
   - **403 Forbidden on create step:** Data-plane RBAC missing. Run `1B_Account_Access.ps1`.
   - **`COSMOS_ENDPOINT` empty:** User env var didn't propagate to process; restart VS Code / terminal.
 
-#### 1C: Cosmos Database Design Concepts (Deck, 20 min)
+#### 1C: Cosmos Database Design Concepts (Deck, 30 min)
 
 > The deck splits 1C around the labs: the **RU + Indexing** half plays before Lab 1D, and the **Data Modeling + Partitioning** half plays after 1D and before Lab 1E. Plan the transitions accordingly.
 
@@ -113,7 +113,7 @@ Self directed VM and account setup steps for students can be found in [StudentEn
 #### 1F: Replication and Security (Deck, 10 min)
 
 - **Key points:** multi-region replication and single- vs multi-write regions; five consistency levels but Session is the default and is right for most apps; control vs data plane RBAC; managed identity over keys.
-- **Demo hook:** In a **cosmos-provisioned** account, Portal -> Cosmos DB -> Settings -> **Replicate data globally** and **Default consistency** blades to show multi-region options.
+- **Demo hook:** In a **cosmos-provisioned** account, Portal -> Cosmos DB -> Settings -> **Replicate data globally** and **Default consistency** blades to show options for adding multi-region and consistency.
 - **Common questions:**
   - *"When would I use multiple regions?"* Primary use case is to reduce latency by reading from local regions. RU scale is also per-region so can help spread loads.
   - *"Why don't data-plane roles show in the Portal IAM blade?"* By design they live in `az cosmosdb sql role assignment`. This is the answer to "I added Contributor but I still get 403." Refer back to the `1B_Account_Access.ps1` script.
@@ -130,7 +130,7 @@ Self directed VM and account setup steps for students can be found in [StudentEn
 
 > **Deck and lab order:** 2A intro (Foundry / setup modes / BYO thread storage) -> **Lab 2C** -> **Lab 2D** -> concept slides (RAG, Security & Governance, Observability & Guardrails, Models & Pricing) -> **Lab 2E** -> **Lab 2F** -> **2B Model Catalog slides** -> **Lab 4A**.
 
-#### 2A (part 1): Foundry + Cosmos DB for Agents and RAG (Deck, ~7 min)
+#### 2A (part 1): Foundry + Cosmos DB for Agents and RAG (Deck, 10 min)
 
 - **Key points:** Foundry as the unified PaaS for agents/models/tools; three setup modes (Basic / Standard / Standard+Private); BYO thread storage in Cosmos DB (`enterprise_memory` database, three containers: `thread-message-store`, `system-thread-message-store`, `agent-entity-store`).
 - **Demo hook:** Open <https://ai.azure.com>, show the workshop project, and click into the **Agents** tab if it's enabled. Even 30 seconds of "this is the surface we're targeting" anchors the rest of Part 2.
@@ -138,19 +138,19 @@ Self directed VM and account setup steps for students can be found in [StudentEn
   - *"What's the difference between Foundry and Azure OpenAI?"* Foundry is the broader unified resource; Azure OpenAI is one of the model surfaces inside it.
   - *"Do I have to use Cosmos DB for thread storage?"* For Standard setup with BYO, yes — that's the supported store today.
 
-#### 2C: Chat Completions and Embeddings (Lab, 20 min target / 25 min actual)
+#### 2C: Chat Completions and Embeddings (Lab, 20 min)
 
 - **Files:** [2C_Completions_Embeddings/](../2C_Completions_Embeddings/)
 - **Key points:** `AzureOpenAI` client construction; basic chat call shape (system/user messages, temperature, max_tokens); streaming via `stream=True`; embeddings shape and dimensionality.
 - **Demo hook:** Run a chat completion with `stream=True` and a long prompt — the token-by-token reveal sells streaming better than any slide.
 - **Common questions:**
   - *"Why does the embedding have 1536 numbers?"* That's the model's output dimensionality; explain it's the "fingerprint" used for similarity later in 2D.
-  - *"Why two different endpoints?"* Lab 4 uses Entra for chat, but embeddings v1 still needs a key. This is current-state, not by design.
+  - *"Why two different endpoints?"* The workshop labs use Entra for chat completions, but embeddings v1 still requires a key. This is current-state, not by design.
 - **Troubleshooting:**
   - **404 on chat completion:** `COMPLETIONS_MODEL` doesn't match the deployment name in Foundry. Verify in ai.azure.com -> Deployments.
   - **Rate limit (429):** Per-student Foundry capacity is small. If a student's cell bursts, expect occasional throttling — re-run usually clears it.
 
-#### 2D: Vector Search (Lab, 25 min)
+#### 2D: Vector Search (Lab, 15 min)
 
 - **Files:** [2D_Vector_Search/](../2D_Vector_Search/)
 - **Pre-flight:** Uses the `WorkshopData.Docs` container — confirm vector embedding policy and DiskANN index are in place.
@@ -160,7 +160,7 @@ Self directed VM and account setup steps for students can be found in [StudentEn
   - *"Why TOP N with ORDER BY VectorDistance?"* That's how nearest-neighbor is expressed — there's no dedicated `VECTOR_SEARCH` syntax.
   - *"Cosine vs dot product?"* Embeddings are normalized, so cosine and dot give the same ranking. We use cosine.
 
-#### 2A (part 2): RAG, Security and Governance, Observability and Guardrails, Models and Pricing (Deck, ~13 min)
+#### 2A (part 2): RAG, Security and Governance, Observability and Guardrails, Models and Pricing (Deck, 15 min)
 
 > Slides 44–47 in the deck. They land *between* Lab 2D and Lab 2E so that the RAG concept arrives just before students build the pipeline in 2E.
 
@@ -172,7 +172,7 @@ Self directed VM and account setup steps for students can be found in [StudentEn
 - **Demo hook:** ai.azure.com -> **Evaluation** / **Tracing** tab on the workshop project (skip if it requires enabling) — even a glance at the surface sets up 2F.
 - **Watch for:** Specific model names on the Models & Pricing slide change fast — sanity-check the catalog the morning of class.
 
-#### 2E: Retrieval-Augmented Generation (RAG) Pipeline (Lab, 45 min target / 60 min actual)
+#### 2E: Retrieval-Augmented Generation (RAG) Pipeline (Lab, 30 min)
 
 - **Files:** [2E_RAG_Pipeline/](../2E_RAG_Pipeline/)
 - **Key points:** chunk -> embed -> store -> retrieve -> generate; chunking strategy matters (sentence boundaries via `nltk`); retrieved chunks become part of the system prompt.
@@ -184,16 +184,17 @@ Self directed VM and account setup steps for students can be found in [StudentEn
   - **`nltk.tokenize` import error:** Need `nltk.download('punkt_tab')` (or `'punkt'` on older nltk). The install cell in the lab covers this, but if students skip it, that's the symptom.
   - **Empty retrieval results:** Check that embeddings were actually upserted — `SELECT VALUE COUNT(1) FROM c WHERE IS_ARRAY(c.embedding)` should match the chunk count.
 
-#### 2F: Evaluation of RAG Outputs (Lab, 25 min target / 35 min actual)
+#### 2F: Evaluation of RAG Outputs (Lab, 20 min)
 
 - **Files:** [2F_Evaluation/](../2F_Evaluation/)
+- **Pre-flight:** 2F's mock retrieval queries `WorkshopData.Docs` where `partitionKey = 'rag'`. That partition is seeded by Lab 2E — if you skip 2E or run 2F first, the context will be empty and the judge scores meaningless.
 - **Key points:** evaluation as a first-class step; ground-truth dataset; LLM-as-judge with a scoring prompt; aggregate scoring; thresholds for action.
 - **Demo hook:** Show a clearly-wrong answer being scored low by the judge — then improve the retrieval (more chunks, better question) and re-run. The score going up sells the iteration loop.
 - **Common questions:**
   - *"Isn't LLM-as-judge biased?"* Yes; in production, pair with human review or use a different model family as the judge. We're using it for tractability.
   - *"Why only 1–5?"* Smaller scale = more consistent judge output. Higher resolution scales drift.
 
-#### 2B: Model Catalog (Deck, 20 min)
+#### 2B: Model Catalog (Deck, 10 min)
 
 > Deck slides 50–54. The rearranged deck plays this **after** Labs 2C–2F — by then students have called the SDK and have a frame of reference for "which model, what deployment shape."
 

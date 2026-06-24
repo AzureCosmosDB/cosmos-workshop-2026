@@ -11,7 +11,6 @@ The lab uses the `1B_SDK_CRUD` directory. A console program walks through each s
 
 - .NET 10 SDK
 - `COSMOS_ENDPOINT` environment variable set to your Cosmos DB account endpoint
-- `COSMOS_ACCOUNT_NAME` environment variable set to your Cosmos DB account name
 
 ## Setup
 

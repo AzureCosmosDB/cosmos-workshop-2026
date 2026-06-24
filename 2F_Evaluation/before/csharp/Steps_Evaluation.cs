@@ -66,7 +66,7 @@ public class Steps_Evaluation
         OpenAIClient = new AzureOpenAIClient(new Uri(foundryEndpoint), credential);
         FoundryEndpoint = foundryEndpoint;
 
-        CompletionsModel = Environment.GetEnvironmentVariable("COMPLETIONS_MODEL") ?? "phi-4-mini-instruct";
+        CompletionsModel = Environment.GetEnvironmentVariable("COMPLETIONS_MODEL") ?? "gpt41";
         EvalModel = Environment.GetEnvironmentVariable("EVAL_MODEL") ?? CompletionsModel;
 
         Console.WriteLine($"  endpoint: {cosmosEndpoint}");
@@ -118,7 +118,7 @@ public class Steps_Evaluation
 
         try
         {
-            var chatClient = OpenAIClient.GetChatClient(CompletionsModel ?? "phi-4-mini-instruct");
+            var chatClient = OpenAIClient.GetChatClient(CompletionsModel ?? "gpt41");
             var completion = await chatClient.CompleteChatAsync(messages, options);
             return completion.Value.Content[0].Text;
         }
@@ -172,7 +172,7 @@ public class Steps_Evaluation
                 MaxOutputTokenCount = 10
             };
 
-            var evalChatClient = OpenAIClient?.GetChatClient(EvalModel ?? CompletionsModel ?? "phi-4-mini-instruct");
+            var evalChatClient = OpenAIClient?.GetChatClient(EvalModel ?? CompletionsModel ?? "gpt41");
 
             try
             {

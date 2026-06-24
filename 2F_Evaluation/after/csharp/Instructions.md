@@ -11,6 +11,7 @@ The lab uses a single project in the `2F_Evaluation` directory. Running `dotnet 
 
 - .NET 10 SDK
 - Environment variables: `COSMOS_ENDPOINT`, `FOUNDRY_ENDPOINT`, `COMPLETIONS_MODEL` (optional), `EVAL_MODEL` (optional)
+- **Lab 2E must have already been run** in this Cosmos account. 2F's mock retrieval reads from the `WorkshopData.Docs` container with `partitionKey = 'rag'`, which is seeded by 2E. Without that data the judge has no context to score against.
 
 This lab focuses on the LLM-as-judge scoring loop; retrieval is mocked with a plain Cosmos query, so no embeddings client is needed (real embedding + vector search is covered in Labs 2D and 2E).
 
