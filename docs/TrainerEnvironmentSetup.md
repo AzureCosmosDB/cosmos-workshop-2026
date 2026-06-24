@@ -371,12 +371,10 @@ Per-cohort cleanup (run after the workshop):
 $batchId = '202606201430'
 
 # Delete all student RGs for the batch
-az group list --query "[?tags.batch=='$batchId'].name" -o tsv |
-  ForEach-Object { az group delete --name $_ --yes --no-wait }
+az group list --query "[?tags.batch=='$batchId'].name" -o tsv | ForEach-Object { az group delete --name $_ --yes --no-wait }
 
 # Delete all Entra users for the batch
-az ad user list --query "[?contains(userPrincipalName, '_${batchId}@')].userPrincipalName" -o tsv |
-  ForEach-Object { az ad user delete --id $_ }
+az ad user list --query "[?contains(userPrincipalName, '_${batchId}@')].userPrincipalName" -o tsv | ForEach-Object { az ad user delete --id $_ }
 ```
 
 Per-cohort Fabric workspace cleanup (batch mode): workspaces persist until manually deleted. Use the Fabric admin portal or the REST API (`DELETE /v1/workspaces/{id}`) — workspace IDs are in `FabricWorkspaceId` in the roster CSV.
