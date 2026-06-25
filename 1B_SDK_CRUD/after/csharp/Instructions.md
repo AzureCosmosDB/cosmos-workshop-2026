@@ -1,6 +1,6 @@
 # Lab 1B: SDK Basics / CRUD in C#
 
-**Time**: ~10 min  
+**Time**: ~15 min  
 **Environment**: Terminal with `.NET 10 SDK`
 
 In this exercise you will perform Create, Read, Update, and Delete operations on Azure Cosmos DB using the C# `Microsoft.Azure.Cosmos` SDK v3 with `DefaultAzureCredential` authentication.

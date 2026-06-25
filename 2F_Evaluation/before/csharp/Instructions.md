@@ -1,6 +1,6 @@
 # Lab 2F: Evaluation in C#
 
-**Time**: ~20 min  
+**Time**: ~15 min  
 **Environment**: .NET 10 terminal
 
 In this exercise you will evaluate a RAG pipeline using the LLM-as-judge pattern.

@@ -1,6 +1,6 @@
 # Lab 1D2: Indexing Policy in C#
 
-**Time**: ~15 min  
+**Time**: ~10 min  
 **Environment**: .NET 10 terminal
 
 In this exercise you will explore Cosmos DB indexing policies and see how custom indexing can reduce RU costs.

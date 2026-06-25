@@ -1,6 +1,6 @@
 # Lab 2E: RAG Pipeline in C#
 
-**Time**: ~30 min  
+**Time**: ~20 min  
 **Environment**: .NET 10 terminal
 
 In this exercise you will build a Retrieval-Augmented Generation (RAG) pipeline using Cosmos DB vector search and Azure OpenAI.

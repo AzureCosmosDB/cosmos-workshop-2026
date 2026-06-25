@@ -52,7 +52,7 @@ Self directed VM and account setup steps for students can be found in [StudentEn
   - *"Can I change the partition key path later?"* No, it's immutable. Create a new container and migrate data.
   - *"Are Cosmos containers like Docker containers?"* Same name, different concept. Containers in Cosmos are more like tables in a SQL database.
 
-#### 1B: SDK Basics (Lab, 10 min)
+#### 1B: SDK Basics (Lab, 15 min)
 
 - **Files:** [1B_SDK_CRUD/](../1B_SDK_CRUD/), `before/python/`, `before/csharp/` (lab steps in `before/csharp/Instructions.md`)
 - **Pre-flight:** Students must have run `1B_Account_Access.ps1` to apply RBAC data-plane roles for their accounts. The lab will 403 otherwise.
@@ -84,7 +84,7 @@ Self directed VM and account setup steps for students can be found in [StudentEn
   - *"What if my query crosses partitions?"* It works but costs more, quantified in lab 1D.
 - **Watch for:** Confusion between "physical partition" (Cosmos-managed, 50 GB / 10k RU) and "logical partition" (partition-key value, 20 GB). Name them explicitly and focus on logical as the user facing concept.
 
-#### 1D: Querying / Indexing (Lab, 30 min)
+#### 1D: Querying / Indexing (Lab, 25 min)
 
 > Includes 2 parts: **1D-1 Query Language** + **1D-2 Indexing Policy**
 
@@ -172,7 +172,7 @@ Self directed VM and account setup steps for students can be found in [StudentEn
 - **Demo hook:** ai.azure.com -> **Evaluation** / **Tracing** tab on the workshop project (skip if it requires enabling) — even a glance at the surface sets up 2F.
 - **Watch for:** Specific model names on the Models & Pricing slide change fast — sanity-check the catalog the morning of class.
 
-#### 2E: Retrieval-Augmented Generation (RAG) Pipeline (Lab, 30 min)
+#### 2E: Retrieval-Augmented Generation (RAG) Pipeline (Lab, 20 min)
 
 - **Files:** [2E_RAG_Pipeline/](../2E_RAG_Pipeline/)
 - **Key points:** chunk -> embed -> store -> retrieve -> generate; chunking strategy matters (sentence boundaries via `nltk`); retrieved chunks become part of the system prompt.
@@ -184,7 +184,7 @@ Self directed VM and account setup steps for students can be found in [StudentEn
   - **`nltk.tokenize` import error:** Need `nltk.download('punkt_tab')` (or `'punkt'` on older nltk). The install cell in the lab covers this, but if students skip it, that's the symptom.
   - **Empty retrieval results:** Check that embeddings were actually upserted — `SELECT VALUE COUNT(1) FROM c WHERE IS_ARRAY(c.embedding)` should match the chunk count.
 
-#### 2F: Evaluation of RAG Outputs (Lab, 20 min)
+#### 2F: Evaluation of RAG Outputs (Lab, 15 min)
 
 - **Files:** [2F_Evaluation/](../2F_Evaluation/)
 - **Pre-flight:** 2F's mock retrieval queries `WorkshopData.Docs` where `partitionKey = 'rag'`. That partition is seeded by Lab 2E — if you skip 2E or run 2F first, the context will be empty and the judge scores meaningless.
