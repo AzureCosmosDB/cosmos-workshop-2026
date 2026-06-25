@@ -29,7 +29,10 @@ $failureCount = 0
 $successCount = 0
 
 foreach ($row in $roster) {
-  $workspaceName = "$WorkspaceNamePrefix-$($row.VmAdminUsername)"
+  if (-not $row.BatchId) {
+    throw "Roster row for '$($row.Student)' is missing BatchId. Re-run provisioning with the current script to regenerate the roster."
+  }
+  $workspaceName = "$WorkspaceNamePrefix-$($row.VmAdminUsername)-$($row.BatchId)"
   $description = "Workshop workspace for $($row.Student) ($($row.UserPrincipalName))."
 
   Write-Output "[$($row.Student)] creating workspace $workspaceName"

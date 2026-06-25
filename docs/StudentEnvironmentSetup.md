@@ -97,9 +97,12 @@ Discovered accounts:
 Cosmos DB Data Contributor role granted on cosmosl4xyz
 Cosmos DB Data Contributor role granted on cosmos-provisioned-l4xyz
 Cognitive Services Contributor role granted on aifoundryl4xyz
+Cognitive Services OpenAI Contributor role granted on aifoundryl4xyz
 ```
 
 This grants **your Entra identity** the data-plane permissions needed for the SDK to read/write Cosmos and call Foundry. Even though you're Owner on the RG, those operations require separate data-plane RBAC permissions that are set by this script.
+
+> The Foundry account also has both `Cognitive Services Contributor` and `Cognitive Services OpenAI Contributor` pre-granted at provisioning time as a safety net. If the script's Foundry grants silently fail, you'll still be able to call chat completions. The Cosmos grants have no such backstop — if those fail, you'll see 403 on the first Cosmos call.
 
 You're done. Open the first lab project in VS Code and start.
 

@@ -234,7 +234,7 @@ Self directed VM and account setup steps for students can be found in [StudentEn
   - *"How do I trim by token budget instead of count?"* Use `tiktoken` open source library to count tokens on each historical turn and pop oldest until under budget. The lab uses less granular count-based trimming for simplicity.
   - *"Why save user and assistant turns separately?"* Each is independently queryable, and the audit trail is cleaner. Storing as a transcript blob makes analytics harder.
 - **Troubleshooting:**
-  - **Auth failure on Foundry chat:** Lab 4 expects Entra; Confirm user's Foundry endpoints and `Cognitive Services Contributor` role on Foundry account to support `DefaultAzureCredential`. Role is set from student run `1B_Account_Access.ps1` script.
+  - **Auth failure on Foundry chat:** Lab 4 expects Entra; confirm user's Foundry endpoints and that **both** `Cognitive Services Contributor` and `Cognitive Services OpenAI Contributor` are assigned on the Foundry account to support `DefaultAzureCredential`. Roles are pre-granted at provisioning and re-applied by `1B_Account_Access.ps1`.
   
 
 #### 4B: Analyzing History Using Fabric Mirror (Lab, 40 min)
@@ -264,6 +264,7 @@ These come up regardless of section.
 | `Forbidden (403)` on first Cosmos call | Data-plane role not assigned to the signed-in user | Run `1B_Account_Access.ps1` with workshop-correct names |
 | `AADSTS50058` or login pops repeatedly | `DefaultAzureCredential` falling through credential chain | `az login` in a terminal, then restart VS Code |
 | Foundry chat returns 401 in lab 4A | Lab 4 uses Entra, not key | Confirm `az login` succeeded and the Foundry role is assigned |
+| Foundry chat returns 403 in lab 2C / 4A with `lacks the required data action` | Lab 1B's Foundry role grants silently failed for this student (provisioning pre-grants `Cognitive Services Contributor` + `Cognitive Services OpenAI Contributor` as a backstop, so this usually means even those haven't propagated yet) | Wait 1–2 min and retry. If persistent, re-run `1B_Account_Access.ps1`, then restart the lab process (token cache) |
 | Embeddings call 401 in any 2x lab | Embeddings v1 endpoint requires `EMBEDDINGS_KEY`, not Entra | Confirm `EMBEDDINGS_KEY` is set in the student's env vars |
 
 ### Throttling and capacity

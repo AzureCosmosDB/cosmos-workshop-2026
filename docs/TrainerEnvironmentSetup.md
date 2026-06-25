@@ -40,7 +40,7 @@ The bicepparam stays at `deployFabric = true` so single-user manual testing is u
 For each student, the script creates:
 
 - **One Entra ID user**: `lab_user{N}_{batchId}@<tenant-default-domain>`, display name `{MMdd-HHmm} Lab User {N}` (the batch-time prefix groups all students from one class together when the Entra users blade is sorted by display name), with a randomly-generated temp password and "force change at next sign-in" set.
-- **One resource group**: `lab-dev{N}-{batchId}`, with the student granted **Owner** on that RG only (via [main.resources.bicep](../bicep/main.resources.bicep) `studentOwnerAssignment`).
+- **One resource group**: `lab-dev{N}-{batchId}`, with the student granted **Owner** on that RG only (via [main.resources.bicep](../bicep/main.resources.bicep) `studentOwnerAssignment`). The student is also pre-granted **Cognitive Services Contributor** and **Cognitive Services OpenAI Contributor** on the Foundry account as a backstop against silent failures of the Lab 1B role grant — Owner alone does not include the OpenAI data actions, and the two-role pairing covers historical drift in which actions each role includes.
 - **All workshop resources inside that RG**, deployed by [main.bicep](../bicep/main.bicep):
   - Cosmos DB serverless account (`cosmosl{N}<unique>`)
   - Cosmos DB provisioned-autoscale account with two containers (`OrdersHot`, `OrdersComposite`), each set to autoscale 100–1000 RU (`cosmos-provisioned-l{N}<unique>`)
@@ -148,7 +148,7 @@ After `provision-student-environments.ps1` finishes, create one Fabric workspace
 
 For each row in the roster, this script:
 
-1. Creates a Fabric workspace named `lab-ws-lab_user{N}` (idempotent — skipped if a workspace with that name already exists).
+1. Creates a Fabric workspace named `lab-ws-lab_user{N}-{batchId}` (idempotent — skipped if a workspace with that name already exists). The batch ID suffix prevents cross-cohort collisions on a shared capacity, where the generic student numbers (`lab_user1`, `lab_user2`, …) would otherwise let a second cohort silently adopt the first cohort's workspace and its content.
 2. Assigns the workspace to the shared Fabric capacity.
 3. Adds the student's Entra identity as workspace **Admin**.
 4. Writes `FabricWorkspaceId` and `FabricWorkspaceName` back into the same roster CSV.
@@ -159,7 +159,7 @@ Parameters:
 |---|---|---|
 | `-RosterCsv` | required | Path to the roster produced by the provisioning script |
 | `-CapacityDisplayName` | `fabricworkshopshared` | Match the name in `shared.bicepparam` if customized |
-| `-WorkspaceNamePrefix` | `lab-ws` | Workspace name format is `<prefix>-<VmAdminUsername>` |
+| `-WorkspaceNamePrefix` | `lab-ws` | Workspace name format is `<prefix>-<VmAdminUsername>-<BatchId>` |
 
 The script logs warnings on per-student failures and continues; exit code is the failure count. Re-running is safe — successful workspaces are detected by name and only the role-assignment / capacity-assignment steps re-run.
 
@@ -198,7 +198,7 @@ After a successful run, each `lab-dev{N}-{batchId}` resource group should contai
 | Resource group | `lab-dev{N}-{batchId}` | Student is Owner |
 | Cosmos DB (serverless) | `cosmosl{N}<unique>` | Used by labs 1B, 1D1, 1D2, 2*, 4A |
 | Cosmos DB (provisioned) | `cosmos-provisioned-l{N}<unique>` | Used by lab 1E (partition-key metrics demo) |
-| AI Foundry account | `aifoundryl{N}<unique>` | Hosts both chat (`gpt41`) and embedding (`textembedding3small`) deployments |
+| AI Foundry account | `aifoundryl{N}<unique>` | Hosts both chat (`gpt41`) and embedding (`textembedding3small`) deployments. Student is pre-granted **Cognitive Services Contributor** + **Cognitive Services OpenAI Contributor** on this account at provisioning. Lab 1B grants the same two roles again as a teaching exercise (the duplicate assignments are idempotent no-ops) |
 | Storage account | `stl{N}<unique>` | General-purpose |
 | Fabric capacity | `fabricl{N}<unique>` | **Single-user test mode only.** F2 SKU. Omitted under `-SharedFabric` |
 | VNet / Subnet / NSG / PIP / NIC | per VM | Networking for the lab VM |

@@ -34,6 +34,12 @@ param embeddingModelName string
 @description('Embedding model version')
 param embeddingModelVersion string
 
+@description('Optional Entra object ID to grant Cognitive Services data-plane access on this account')
+param studentOwnerObjectId string = ''
+
+var cognitiveServicesContributorRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68')
+var openAiContributorRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'a001fd3d-188f-4b5d-821b-7da978bf7442')
+
 resource aiFoundryAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   name: accountName
   location: location
@@ -99,6 +105,28 @@ resource embeddingModelDeployment 'Microsoft.CognitiveServices/accounts/deployme
   dependsOn: [
     chatModelDeployment
   ]
+}
+
+// Grant the student data-plane access to chat completions / embeddings on this account.
+// RG-level Owner does not include `Microsoft.CognitiveServices/accounts/OpenAI/.../action`.
+resource studentCognitiveServicesContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(studentOwnerObjectId)) {
+  scope: aiFoundryAccount
+  name: guid(aiFoundryAccount.id, studentOwnerObjectId, cognitiveServicesContributorRoleId)
+  properties: {
+    roleDefinitionId: cognitiveServicesContributorRoleId
+    principalId: studentOwnerObjectId
+    principalType: 'User'
+  }
+}
+
+resource studentOpenAiContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(studentOwnerObjectId)) {
+  scope: aiFoundryAccount
+  name: guid(aiFoundryAccount.id, studentOwnerObjectId, openAiContributorRoleId)
+  properties: {
+    roleDefinitionId: openAiContributorRoleId
+    principalId: studentOwnerObjectId
+    principalType: 'User'
+  }
 }
 
 output endpoint string = aiFoundryAccount.properties.endpoint

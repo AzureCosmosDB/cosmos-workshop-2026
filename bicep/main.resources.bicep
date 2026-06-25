@@ -172,6 +172,7 @@ module foundry './modules/foundry.bicep' = if (deployFoundry) {
     embeddingDeploymentName: foundryEmbeddingDeploymentName
     embeddingModelName: foundryEmbeddingModelName
     embeddingModelVersion: foundryEmbeddingModelVersion
+    studentOwnerObjectId: studentOwnerObjectId
   }
 }
 

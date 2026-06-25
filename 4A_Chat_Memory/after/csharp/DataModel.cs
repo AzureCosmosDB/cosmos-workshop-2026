@@ -1,5 +1,10 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Serialization;
+
 namespace Lab4A;
 
+[JsonConverter(typeof(StringEnumConverter), typeof(CamelCaseNamingStrategy))]
 public enum MessageRole { System, User, Assistant }
 
 record ChatStoreMessage(

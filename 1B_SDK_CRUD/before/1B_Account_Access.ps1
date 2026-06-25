@@ -69,10 +69,15 @@ az cosmosdb sql role assignment create `
   --scope "/"
 Write-Output "Cosmos DB Data Contributor role granted on $ACCT_NAME_PROVISIONED"
 
-# ---- Foundry data-plane access (Cognitive Services Contributor) for Entra-auth chat completions ----
+# ---- Foundry data-plane access for Entra-auth chat completions ----
+# Two roles granted together — the broad Contributor for general account access and
+# the OpenAI-specific Contributor to guarantee chat/embedding/fine-tune data actions,
+# whose coverage in the broader role may vary across Azure releases.
 $FOUNDRY_SCOPE = "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.CognitiveServices/accounts/$FOUNDRY_ACCT_NAME"
 az role assignment create --assignee $USER_ID --role "Cognitive Services Contributor" --scope $FOUNDRY_SCOPE
 Write-Output "Cognitive Services Contributor role granted on $FOUNDRY_ACCT_NAME"
+az role assignment create --assignee $USER_ID --role "Cognitive Services OpenAI Contributor" --scope $FOUNDRY_SCOPE
+Write-Output "Cognitive Services OpenAI Contributor role granted on $FOUNDRY_ACCT_NAME"
 
 # ---- Mirror the cosmos endpoints into env vars for SDK samples ----
 # SetEnv.ps1 already wrote these, but re-set them here so that re-running this

@@ -20,19 +20,19 @@ Before starting, confirm:
 ### Step 1: Open the Fabric workspace
 
 1. Navigate to https://app.fabric.microsoft.com/ and sign in with the workshop credentials.
-2. Open the pre-provisioned workspace for your user.
-3. Confirm you can see the workspace's items list — you will create a Mirrored DB and two notebooks here.
+2. Open the pre-provisioned workspace for your user (**lab-ws-...**).
+3. Confirm you can see the workspace's items list - you will create a Mirrored DB and notebook here.
 
 ---
 
 ### Step 2: Mirror the `Messages` container
 
 1. In the workspace, click **+ New item**.
-2. Search for and select **Mirrored Azure Cosmos DB for NoSQL**.
-3. Enter the Cosmos DB **account URI** from `COSMOS_ENDPOINT`.
-4. Choose **Organizational account / Entra ID** for the authentication method (this is preferred over account key).
+2. Search for and select **Mirrored Azure Cosmos DB**.
+3. Enter the Cosmos DB **account URI** for your serverless Cosmos DB account: from the resource in Azure Portal or `$env:COSMOS_ENDPOINT` in Powershell.
+4. Choose **Organizational account / Entra ID** for the authentication method (this is preferred over account key) and sign in with your lab Entra user and Connect.
 5. Pick the source database **`Conversations`** and check the **`Messages`** container.
-6. Name the mirrored item (for example `Conversations_Mirror`) and click **Mirror database**.
+6. Name the mirrored item (for example `Conversations_Mirror`) and click **Create mirrored database**.
 7. On the resulting Mirrored DB page, wait until **Replication status** reads **Running** and **Rows replicated** and **Last completed** columns populate for `Messages`. Initial snapshots typically complete in 1–2 minutes for the workshop volume.
 
 **Expected output**: Mirrored DB item shows **Replication status = Running** and the `Messages` table is visible from the SQL analytics endpoint.
@@ -102,7 +102,7 @@ Add a new Code cell to create the next query. Fill in the missing pieces of the 
 
 Add another new Code cell. Write a T-SQL query that ranks sessions by total turn count and returns the top 5.
 
-**Expected output**: Up to five rows showing `sessionId` and `TurnCount`, ordered from most to least active.
+**Expected output**: Up to five rows showing `sessionId` and `TurnCount`, ordered from most to least active. If you only see a single session, re-running the completed 4A steps from the beginning will add a new one each time.
 
 **Hint**: `GROUP BY sessionId` and use `COUNT(*)`. Use `ORDER BY ... DESC` plus `TOP 5` (or `OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY`).
 
