@@ -65,7 +65,7 @@ Self directed VM and account setup steps for students can be found in [StudentEn
   - **403 Forbidden on create step:** Data-plane RBAC missing. Run `1B_Account_Access.ps1`.
   - **`COSMOS_ENDPOINT` empty:** User env var didn't propagate to process; restart VS Code / terminal.
 
-#### 1C: Cosmos Database Design Concepts (Deck, 30 min)
+#### 1C: Cosmos Database Design Concepts (Deck, 40 min)
 
 > The deck splits 1C around the labs: the **RU + Indexing** half plays before Lab 1D, and the **Data Modeling + Partitioning** half plays after 1D and before Lab 1E. Plan the transitions accordingly.
 
@@ -102,9 +102,10 @@ Self directed VM and account setup steps for students can be found in [StudentEn
 #### 1E: Data Modeling / Partition Keys (Lab, 60 min)
 
 - **Files:** [1E_Data_Modeling/](../1E_Data_Modeling/)
-- **Key points:** model around access patterns, not normalization; embed when read together, reference when updated separately; composite or hierarchical partition keys (HPK) for avoiding hot partitions.
+- **Key points:** model around access patterns, not normalization; embed when read together, reference when updated separately; example models each illustrate specific reasons to choose embed or reference; composite or hierarchical partition keys (HPK) for avoiding hot partitions.
 - **Demo hook:** Focus on how the example SQL JOIN does not work conceptually in Cosmos with a multi-container reference model.
 - **Common questions:**
+  - *"How do I choose a data model?"* Start by defining your common access patterns and build structure that will minimize impact on read or write scenarios. Steer students toward the included examples and key decision points presented in them.
   - *"How is HPK different from a composite/synthetic key?"* HPK is a first-class Cosmos feature including SDK support, limited to three paths but uses property values directly. Synthetic keys (`f"{a}#{b}"`) are a simplified pattern that fits in existing containers without needing to redefine partition key paths.
   - *"Why aren't multiple partitions shown in portal metrics?"* Lab uses small data volume that fits within one physical partition so all logical partitions are grouped within same bucket. Containers over 10k RU start to split and show the concentrating effect of hot partitions directly in the metrics.
 - **Troubleshooting:**
@@ -120,7 +121,7 @@ Self directed VM and account setup steps for students can be found in [StudentEn
 
 #### 1G: Monitoring and Troubleshooting (Deck, 30 min)
 
-- **Key points:** common errors (429, 404, 409/412); Azure Monitor metrics out of the box; key metrics (status codes, normalized RU, data size); diagnostic settings needed for log categories.
+- **Key points:** common errors (429, 404, 409, 412); Azure Monitor metrics out of the box; key metrics (status codes, normalized RU, data size); diagnostic settings needed for log categories.
 - **Common questions:**
   - *"What is a 429 error?"* `Too Many Requests` which indicates hitting RU limits. Infrequent 429s can be handled by retry but avoid rapid retries compounding the problem. Patterns of frequent 429s indicate need to reduce query cost or increase RUs.
   - *"What's normalized RU consumption?"* Per-second utilization across partitions, used for autoscale decisions. A sustained value above ~80% is scale-up signal.
@@ -162,13 +163,13 @@ Self directed VM and account setup steps for students can be found in [StudentEn
 
 #### 2A (part 2): RAG, Security and Governance, Observability and Guardrails, Models and Pricing (Deck, 15 min)
 
-> Slides 44–47 in the deck. They land *between* Lab 2D and Lab 2E so that the RAG concept arrives just before students build the pipeline in 2E.
+> Slides 53-56 in the deck. They land *between* Lab 2D and Lab 2E so that the RAG concept arrives just before students build the pipeline in 2E.
 
 - **Key points:**
   - **RAG pattern overview:** chunk -> embed -> store -> retrieve -> generate; Cosmos DB serves as both operational store and vector store, removing the need for a separate search service.
   - **Security & Governance for Agents:** Entra Agent ID gives each agent a first-class directory identity; Administrator / Project Manager / Project User RBAC roles; customer-managed keys for sensitive data.
   - **Observability & Guardrails:** built-in evaluation, OpenTelemetry tracing, Azure Monitor + Aspire dashboards; Azure AI Content Safety (Prompt Shields, PII detection, Task Adherence).
-  - **Models & Pricing:** broad family lineup (GPT-5/4.1/4o/o-series, Claude/Grok/Mistral/DeepSeek/Phi-4/Llama, audio/image/video); platform is free, you pay for what you deploy.
+  - **Models & Pricing:** broad family lineup (GPT series, Claude/Grok/Mistral/DeepSeek/Phi-4/Llama, audio/image/video); platform is free, you pay for what you deploy.
 - **Demo hook:** ai.azure.com -> **Evaluation** / **Tracing** tab on the workshop project (skip if it requires enabling) — even a glance at the surface sets up 2F.
 - **Watch for:** Specific model names on the Models & Pricing slide change fast — sanity-check the catalog the morning of class.
 
@@ -186,6 +187,8 @@ Self directed VM and account setup steps for students can be found in [StudentEn
 
 #### 2F: Evaluation of RAG Outputs (Lab, 15 min)
 
+> **Note**: this section may be cut for time without impacting overall flow or prerequisites of later labs
+
 - **Files:** [2F_Evaluation/](../2F_Evaluation/)
 - **Pre-flight:** 2F's mock retrieval queries `WorkshopData.Docs` where `partitionKey = 'rag'`. That partition is seeded by Lab 2E — if you skip 2E or run 2F first, the context will be empty and the judge scores meaningless.
 - **Key points:** evaluation as a first-class step; ground-truth dataset; LLM-as-judge with a scoring prompt; aggregate scoring; thresholds for action.
@@ -194,20 +197,19 @@ Self directed VM and account setup steps for students can be found in [StudentEn
   - *"Isn't LLM-as-judge biased?"* Yes; in production, pair with human review or use a different model family as the judge. We're using it for tractability.
   - *"Why only 1–5?"* Smaller scale = more consistent judge output. Higher resolution scales drift.
 
-#### 2B: Model Catalog (Deck, 10 min)
+#### 2B: Model Catalog (Deck, 5 min)
 
-> Deck slides 50–54. The rearranged deck plays this **after** Labs 2C–2F — by then students have called the SDK and have a frame of reference for "which model, what deployment shape."
+> Deck slides 59-61. The rearranged deck plays this **after** Labs 2C–2F — by then students have called the SDK and have a frame of reference for "which model, what deployment shape."
 
-- **Key points:** Azure Direct vs Partner/Community billing; model families (GPT-5/4.1/4o/o-series, embeddings, Claude/Grok/Mistral/etc.); fine-tuning options (SFT/DPO/RFT per family); deployment types (Instant, GlobalStandard, GlobalProvisionedManaged, GlobalBatch, DataZone variants, Standard, DeveloperTier); managed identity preferred over keys.
+- **Key points:** Azure Direct vs Partner/Community billing; model families (GPT-5/4.1/4o/o-series, embeddings, Claude/Grok/Mistral/etc.); fine-tuning options for model customization; managed identity preferred over keys; choosing between Catalog and Resource.
 - **Demo hook:** ai.azure.com -> Model Catalog filter sidebar. Toggle filters to show how a real customer would narrow from ~1,900 models to 3.
 - **Common questions:**
-  - *"When do I pick Catalog vs an Azure OpenAI resource?"* Catalog = flexible per-invocation usage; AOAI resource = dedicated capacity with stronger SLAs.
-  - *"What's the difference between Instant and GlobalStandard?"* Instant skips deployment entirely (pay-per-token, preview); GlobalStandard is the highest-quota pay-per-token deployment.
-- **Watch for:** Slides may name specific models that change quickly — sanity-check the catalog the morning of class for any deprecations.
+  - *"When do I pick Catalog vs an Azure OpenAI resource?"* Catalog = flexible per-invocation usage; Foundry resource = dedicated capacity with stronger SLAs.
+- **Watch for:** Slides try to stick to general descriptions of model families since models change quickly and specific examples called out may be deprecated.
 
 #### Bridge to Part 4: Lab 4A following close of Part 2
 
-> Deck slide 55. Scheduling **Lab 4A (Conversational History / Agent Memory)** immediately after 2B slides, before the Part 3 section divider, can help reinforce the agent-memory pattern while Foundry is still fresh and break up the slide sections. This also allows for cutting Fabric content for time if needed. 4A can also still be run following Part 3 if that order is preferred for a given class session.
+> Deck slide 62. Scheduling **Lab 4A (Conversational History / Agent Memory)** immediately after 2B slides, before the Part 3 section divider, can help reinforce the agent-memory pattern while Foundry is still fresh and break up the slide sections. This also allows for cutting Fabric content for time if needed. 4A can also still be run following Part 3 if that order is preferred for a given class session.
 
 ### Part 3: Unify Data Estate
 
