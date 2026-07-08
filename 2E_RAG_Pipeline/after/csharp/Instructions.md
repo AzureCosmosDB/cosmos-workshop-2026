@@ -14,6 +14,8 @@ The lab uses a single project in the `2E_RAG_Pipeline` directory. Running `dotne
 
 Chat completions go through an Azure AI Foundry endpoint with Entra ID auth. Embeddings go through a separate Azure OpenAI resource with API key auth (the v1 embeddings surface does not yet support Entra ID).
 
+> **Lab order**: This lab seeds the shared RAG corpus into `WorkshopData/Docs` (partition key `rag`) that **Lab 2F** reads for its evaluation. Complete the labs in order — running them out of sequence can leave the `rag` partition empty or mixed with another lab's documents (Lab 4A also writes to this partition).
+
 ## Run the lab
 
 ```bash
