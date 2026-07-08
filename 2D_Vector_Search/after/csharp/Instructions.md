@@ -44,7 +44,7 @@ var vectorQuery = """
     """;
 ```
 
-**Expected output**: Top 2 documents most similar to "cosmos db vector search" with their scores.
+**Expected output**: the top 2 documents most similar to *"finding related information based on concepts instead of exact words"*. The **Vector Search** doc ranks first — matched by **meaning**, even though the query shares almost no keywords with it.
 
 ### Step 3: Full-Text Search (STUDENT EXERCISE)
 
@@ -56,7 +56,7 @@ var ftsQuery = new QueryDefinition(
     .WithParameter("@search", searchText);
 ```
 
-**Expected output**: Documents whose `text` matches `"cosmos db"`.
+**Expected output**: the **Provisioned Throughput** doc — the only one whose `text` literally contains the word `"throughput"`. Contrast this with Step 2: full-text search matches **exact keywords**, while vector search matched by **meaning**.
 
 ## Lab Complete!
 

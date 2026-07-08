@@ -75,22 +75,22 @@ public class Steps_Vector_Search
             new Dictionary<string, object>
             {
                 { "id", "d1" },
-                { "title", "Introduction to Cosmos DB" },
-                { "text", "Azure Cosmos DB is a globally distributed, multi-model database service." },
+                { "title", "Global Distribution" },
+                { "text", "Azure Cosmos DB replicates your data across regions worldwide for low-latency access." },
                 { "partitionKey", "docs" }
             },
             new Dictionary<string, object>
             {
                 { "id", "d2" },
-                { "title", "Vector Search Basics" },
-                { "text", "Vector search enables semantic similarity search on embeddings." },
+                { "title", "Vector Search" },
+                { "text", "Vector search retrieves documents by meaning, even when they share no keywords with the query." },
                 { "partitionKey", "docs" }
             },
             new Dictionary<string, object>
             {
                 { "id", "d3" },
-                { "title", "Full-Text Search Guide" },
-                { "text", "Full-text search in Cosmos DB supports natural language queries." },
+                { "title", "Provisioned Throughput" },
+                { "text", "Provisioned throughput reserves request units per second for predictable performance." },
                 { "partitionKey", "docs" }
             }
         };
@@ -138,7 +138,7 @@ public class Steps_Vector_Search
 
         var embeddingClient = EmbeddingsOpenAIClient.GetEmbeddingClient(EmbeddingsModel);
 
-        string searchText = "cosmos db vector search";
+        string searchText = "finding related information based on concepts instead of exact words";
         Console.WriteLine($"Searching for: {searchText}\n");
 
         var queryEmbedding = await embeddingClient.GenerateEmbeddingAsync(searchText);
@@ -183,7 +183,7 @@ public class Steps_Vector_Search
 
         Console.WriteLine("\n=== Step 3: Full-Text Search (STUDENT EXERCISE) ===\n");
 
-        string searchText = "cosmos db";
+        string searchText = "throughput";
 
         // Student exercise: Write a full-text search query using FullTextContains
 
