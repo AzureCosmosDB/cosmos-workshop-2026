@@ -52,9 +52,9 @@ public class Steps_Indexing
 
         Console.WriteLine("\n=== Step 1: Inspect Default Indexing Container (Prebuilt) ===\n");
 
-        // NOTE: Containers are pre-created via `az cosmosdb sql container create` because
-        // Cosmos DB AAD tokens only authorize data-plane operations, not container CRUD.
-        // See Instructions.md for the setup commands.
+        // NOTE: Containers are deployed in advance by the workshop Bicep template
+        // (bicep/modules/cosmosdb.bicep) because Cosmos DB AAD tokens only authorize
+        // data-plane operations, not control-plane operations like creating containers.
 
         var container = DB.GetContainer(DefaultContainerName);
         var props = await container.ReadContainerAsync();
