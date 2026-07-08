@@ -1,0 +1,64 @@
+{
+  "customers": [
+    {
+      "id": "cust_001", "partitionKey": "default", "name": "Alice Anderson",
+      "addresses": [ { "customerId": "cust_001", "street": "100 Main St", "city": "Seattle",       "state": "WA", "zipCode": "98101" } ]
+    },
+    {
+      "id": "cust_002", "partitionKey": "default", "name": "Bob Brown",
+      "addresses": [ { "customerId": "cust_002", "street": "200 Oak Ave", "city": "Portland",      "state": "OR", "zipCode": "97201" } ]
+    },
+    {
+      "id": "cust_003", "partitionKey": "default", "name": "Carol Chen",
+      "addresses": [ { "customerId": "cust_003", "street": "300 Pine Rd", "city": "San Francisco", "state": "CA", "zipCode": "94107" } ]
+    }
+  ],
+  "products": [
+    { "id": "prod_001", "partitionKey": "default", "name": "Wireless Headphones", "price":  79.99, "category": "Electronics" },
+    { "id": "prod_002", "partitionKey": "default", "name": "Smart Watch",         "price": 249.00, "category": "Electronics" },
+    { "id": "prod_003", "partitionKey": "default", "name": "Cosmos DB Cookbook",  "price":  39.99, "category": "Books" },
+    { "id": "prod_004", "partitionKey": "default", "name": "Standing Desk",       "price": 399.00, "category": "Furniture" },
+    { "id": "prod_005", "partitionKey": "default", "name": "Office Chair",        "price": 299.00, "category": "Furniture" }
+  ],
+  "orders": [
+    {
+      "id": "order_001", "partitionKey": "default", "docType": "order",
+      "date": "2026-01-15T00:00:00Z", "totalAmount": 119.98,
+      "customerId": "cust_001", "customerName": "Alice Anderson",
+      "customerStreet": "100 Main St", "customerCity": "Seattle", "customerState": "WA", "customerZipCode": "98101",
+      "lines": [
+        { "productId": "prod_001", "productName": "Wireless Headphones", "productPrice":  79.99, "productCategory": "Electronics", "quantity": 1, "lineTotal":  79.99 },
+        { "productId": "prod_003", "productName": "Cosmos DB Cookbook",  "productPrice":  39.99, "productCategory": "Books",       "quantity": 1, "lineTotal":  39.99 }
+      ]
+    },
+    {
+      "id": "order_002", "partitionKey": "default", "docType": "order",
+      "date": "2026-02-10T00:00:00Z", "totalAmount": 498.00,
+      "customerId": "cust_002", "customerName": "Bob Brown",
+      "customerStreet": "200 Oak Ave", "customerCity": "Portland", "customerState": "OR", "customerZipCode": "97201",
+      "lines": [
+        { "productId": "prod_002", "productName": "Smart Watch", "productPrice": 249.00, "productCategory": "Electronics", "quantity": 2, "lineTotal": 498.00 }
+      ]
+    },
+    {
+      "id": "order_003", "partitionKey": "default", "docType": "order",
+      "date": "2026-03-05T00:00:00Z", "totalAmount": 698.00,
+      "customerId": "cust_001", "customerName": "Alice Anderson",
+      "customerStreet": "100 Main St", "customerCity": "Seattle", "customerState": "WA", "customerZipCode": "98101",
+      "lines": [
+        { "productId": "prod_004", "productName": "Standing Desk", "productPrice": 399.00, "productCategory": "Furniture", "quantity": 1, "lineTotal": 399.00 },
+        { "productId": "prod_005", "productName": "Office Chair",  "productPrice": 299.00, "productCategory": "Furniture", "quantity": 1, "lineTotal": 299.00 }
+      ]
+    },
+    {
+      "id": "inv_001", "partitionKey": "default", "docType": "invoice",
+      "date": "2026-01-20T00:00:00Z", "totalAmount": 150.00,
+      "description": "Premium support — January 2026"
+    },
+    {
+      "id": "inv_002", "partitionKey": "default", "docType": "invoice",
+      "date": "2026-02-15T00:00:00Z", "totalAmount": 250.00,
+      "description": "Migration consulting — February 2026"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+[
+  {
+    "id": "cosmos_overview",
+    "title": "Cosmos DB Overview",
+    "text": "Azure Cosmos DB is a globally distributed, multi-model database service. Through its Core API it provides a query language with SQL like syntax over schemaless documents. Cosmos DB provides five consistency levels: Strong, Bounded Staleness, Session, Consistent Prefix, and Eventual."
+  },
+  {
+    "id": "cosmos_vector_search",
+    "title": "Vector Search in Cosmos DB",
+    "text": "Azure Cosmos DB supports vector indexing for semantic similarity search. The VectorDistance function calculates similarity between a stored embedding and a query embedding, and DiskANN indexes accelerate nearest-neighbor lookups across large vector collections."
+  },
+  {
+    "id": "cosmos_partitioning",
+    "title": "Partitioning and Data Modeling",
+    "text": "Effective data modeling in Cosmos DB starts with choosing a partition key that distributes load evenly. Hierarchical (composite) partition keys help avoid hot partitions, and denormalized documents minimize cross-partition queries for read-heavy workloads."
+  },
+  {
+    "id": "cosmos_request_units",
+    "title": "Request Units (RU/s)",
+    "text": "Throughput in Cosmos DB is measured in Request Units per second (RU/s). Every read, write, and query consumes RUs based on document size, indexing, and query complexity. Provisioned, autoscale, and serverless are the three throughput modes available."
+  },
+  {
+    "id": "cosmos_change_feed",
+    "title": "Change Feed",
+    "text": "The Cosmos DB change feed exposes an ordered stream of inserts and updates per partition. It powers event-driven architectures, materialized views, and downstream synchronization with services like Azure Functions, Synapse Link, and Microsoft Fabric mirroring."
+  }
+]
