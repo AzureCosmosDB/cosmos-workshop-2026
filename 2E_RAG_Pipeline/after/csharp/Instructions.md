@@ -16,6 +16,8 @@ Chat completions go through an Azure AI Foundry endpoint with Entra ID auth. Emb
 
 > **Lab order**: This lab seeds the shared RAG corpus into `WorkshopData/Docs` (partition key `rag`) that **Lab 2F** reads for its evaluation. Complete the labs in order — running them out of sequence can leave the `rag` partition empty or mixed with another lab's documents (Lab 4A also writes to this partition).
 
+> **Pre-provisioned container**: The `Docs` container is created in advance by the workshop Bicep template (`bicep/modules/cosmosdb.bicep`) with a vector embedding policy (`/embedding`, 1536 dimensions, cosine) and a DiskANN vector index. The lab stores and queries vectors without creating or configuring the container (Cosmos DB AAD tokens only authorize data-plane operations).
+
 ## Run the lab
 
 ```bash
