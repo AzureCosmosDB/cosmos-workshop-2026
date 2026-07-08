@@ -63,7 +63,7 @@ public class Steps_Query_Language
                   tags = new[] { "organic", "fresh" },
                   nutrition = new { calories = 55,  vitamins = new[] { "C", "K", "A" } } },
             new { id = "3", name = "Bananas",  category = "fruit",     price = 0.80, partitionKey = "grocery",
-                  tags = new[] { "imported", "ripe" },
+                  tags = new[] { "imported", "ripe", "organic" },
                   nutrition = new { calories = 105, vitamins = new[] { "B6", "C" } } },
             new { id = "4", name = "Carrots",  category = "vegetable", price = 1.00, partitionKey = "grocery",
                   tags = new[] { "organic", "root", "fresh" },
@@ -141,7 +141,8 @@ public class Steps_Query_Language
         double pointReadRu = pointReadResponse.RequestCharge;
 
         var iterator = _container.GetItemQueryIterator<dynamic>(
-            new QueryDefinition("SELECT * FROM c WHERE c.id = '1'"));
+            new QueryDefinition("SELECT * FROM c WHERE c.id = @id").WithParameter("@id", "1"),
+            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey("grocery") });
 
         double queryRuActual = 0;
         FeedResponse<dynamic> response = null!;
@@ -152,7 +153,7 @@ public class Steps_Query_Language
         }
 
         Console.WriteLine($"Point read (1 item by id + partition key): {pointReadRu} RU");
-        Console.WriteLine($"Query  (SELECT * FROM c WHERE c.id='1'):   {queryRuActual} RU");
+        Console.WriteLine($"Query  (WHERE c.id=@id, pk='grocery'):    {queryRuActual} RU");
         Console.WriteLine($"Point read is {queryRuActual / pointReadRu:F1}x cheaper for fetching a single item by id.");
     }
     #endregion
