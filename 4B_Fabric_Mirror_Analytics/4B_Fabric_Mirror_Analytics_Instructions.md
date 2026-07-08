@@ -166,6 +166,8 @@ Add a new Code cell. Write a query that computes the average character length of
 
 Every assistant turn written by Lab 4A's `chat_agent(...)` carries an analytics payload under `metadata` that includes `latencyMs`, `promptTokens`, `completionTokens`, `totalTokens`, `ragHits`, and `retrievedDocIds`. The mirror exposes `metadata` to the SQL endpoint as a JSON **string** — you address its fields with `JSON_VALUE(metadata, '$.<field>')`, casting the result to the type you want.
 
+> **Note**: Lab 4A's Step 2 also writes one *seed* assistant turn per session with zeroed metadata (`latencyMs = 0`, `totalTokens = 0`, no `retrievedDocIds`). It shows up in the latency and token aggregates below as a 0 ms / 0-token row. To compute percentiles over real agent turns only, filter it out — e.g. add `AND JSON_VALUE(metadata, '$.latencyMs') > 0` to the `WHERE` clause.
+
 Compute the p50 / p95 / p99 end-to-end latency of assistant responses.
 
 **Expected output**: A single row with `P50`, `P95`, and `P99` columns in milliseconds.

@@ -28,7 +28,7 @@ The `ItemsDefaultIndex` and `ItemsCustomIndex` containers in the `WorkshopData` 
 }
 ```
 
-The two forms illustrate two patterns: `?` excludes the scalar value at a path (used here for a single ~10 KB string in `largeBlob`), while `*` excludes everything under a path (used here for the nested `metadata` object with ~50 fields). Step 3 writes a document combining both — the default container indexes all of it, the custom container skips both, producing the measurable RU difference.
+The two forms illustrate two patterns: `?` excludes the scalar value at a path (used here for a single ~10 KB string in `largeBlob`), while `*` excludes everything under a path (used here for the nested `metadata` object with ~50 fields). Step 5 writes a document combining both — the default container indexes all of it, the custom container skips both, producing the measurable RU difference.
 
 ## Indexing Operations
 

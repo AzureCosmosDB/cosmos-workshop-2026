@@ -132,7 +132,12 @@ public class Steps_Chat_Memory
             )
         );
 
-        Console.WriteLine(JsonSerializer.Serialize(sampleChatStoreMessage, new JsonSerializerOptions { WriteIndented = true }));
+        Console.WriteLine(JsonSerializer.Serialize(sampleChatStoreMessage, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+        }));
         Console.WriteLine("\nThis is the record schema used to store conversation turns in Cosmos DB.");
 
         await SaveChatTurn(SessionId, MessageRole.User, "What is Cosmos DB?");

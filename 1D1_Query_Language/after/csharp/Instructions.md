@@ -47,7 +47,7 @@ var query = new QueryDefinition("SELECT * FROM c WHERE c.category = @cat")
 
 ### Step 3: Point Read vs Query Cost
 
-Fetches the same single item (`id = "1"`) two ways — a point read and a `SELECT * FROM c WHERE c.id = '1'` query — and compares their RU charges. Same logical result, two access patterns, so the RU difference is a fair head-to-head.
+Fetches the same single item (`id = "1"`) two ways — a point read and a parameterized, partition-scoped `SELECT * FROM c WHERE c.id = @id` query (scoped to the `grocery` partition via request options) — and compares their RU charges. Both target the same single item, so the honest takeaway is that the point read is cheaper than a query for fetching one item by id. (Scoping the query to the partition doesn't lower its RU here — a serverless account is a single physical partition — but it's the correct, best-practice way to write the query.)
 
 ### Step 4: Parameterized Query (STUDENT EXERCISE)
 
@@ -71,7 +71,7 @@ var query = new QueryDefinition(
     "WHERE ARRAY_CONTAINS(c.tags, 'organic') AND c.nutrition.calories < 100");
 ```
 
-**Expected output**: Apples, Broccoli, and Carrots — the organic items under 100 calories.
+**Expected output**: Apples, Broccoli, and Carrots — the organic items under 100 calories. (Organic Bananas at 105 calories are excluded by the `< 100` filter.)
 
 ### Step 6: Subquery Over a Nested Array (STUDENT EXERCISE)
 
