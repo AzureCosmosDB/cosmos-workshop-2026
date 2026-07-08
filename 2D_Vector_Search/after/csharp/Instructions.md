@@ -15,6 +15,8 @@ The lab uses a single project in the `2D_Vector_Search` directory. Running `dotn
 
 Embeddings go through a separate Azure OpenAI resource with API key auth (the v1 embeddings surface does not yet support Entra ID).
 
+> **Note**: `EMBEDDINGS_MODEL` must be a **1536-dimension** model (e.g. `text-embedding-3-small`) to match the `/embedding` vector policy on the pre-provisioned `Docs` container. A model with different dimensions (e.g. `text-embedding-3-large` at 3072) will fail vector writes and queries.
+
 ## Run the lab
 
 ```bash
