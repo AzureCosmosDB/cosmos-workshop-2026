@@ -13,6 +13,9 @@ param vmComputerName string
 @description('VM size')
 param vmSize string
 
+@description('Disk controller type - use NVMe for v5/v6 series sizes that support it')
+param diskControllerType string = 'SCSI'
+
 @description('VM admin username')
 param adminUsername string
 
@@ -35,7 +38,7 @@ var vmPropertiesBase = {
     vmSize: vmSize
   }
   storageProfile: {
-    diskControllerType: 'SCSI'
+    diskControllerType: diskControllerType
     osDisk: {
       createOption: 'fromImage'
       managedDisk: {

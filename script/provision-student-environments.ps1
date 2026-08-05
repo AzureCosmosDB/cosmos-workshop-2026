@@ -22,6 +22,9 @@ param(
   [switch]$SharedFabric,
 
   [Parameter(Mandatory = $false)]
+  [switch]$NoFabric,
+
+  [Parameter(Mandatory = $false)]
   [string]$SharedFabricResourceGroup = 'lab-shared-fabric',
 
   [Parameter(Mandatory = $false)]
@@ -103,13 +106,18 @@ $activeSubscriptionId = (& az account show --query id -o tsv).Trim()
 Assert-LastAzCommand -FailureMessage 'Failed to read the active az subscription id. Run az login first.'
 
 $tenantDomain = Get-TenantDomain -ExplicitDomain $TenantDomain
-$batchId = (Get-Date).ToUniversalTime().ToString('yyyyMMddHHmm')
+# Seconds resolution avoids UPN/resource-group collisions between runs started in the same minute.
+$batchId = (Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmss')
 # Short, sortable prefix for Entra display names: groups users from the same
 # batch together when the directory's display-name column is sorted.
 $batchShort = '{0}-{1}' -f $batchId.Substring(4, 4), $batchId.Substring(8, 4)
 $csvPath = Join-Path $OutputDirectory "students-$batchId.csv"
 $results = New-Object System.Collections.Generic.List[object]
 $mirroringRbacFailures = New-Object System.Collections.Generic.List[string]
+
+if ($SharedFabric -and $NoFabric) {
+  throw '-SharedFabric and -NoFabric are mutually exclusive.'
+}
 
 $sharedFabricCapacityId = $null
 if ($SharedFabric) {
@@ -127,7 +135,9 @@ Write-Output "Provisioning $StudentCount student environment(s)."
 Write-Output "  Batch ID:      $batchId"
 Write-Output "  Tenant domain: $tenantDomain"
 Write-Output "  Location:      $Location"
-if ($SharedFabric) {
+if ($NoFabric) {
+  Write-Output "  Fabric mode:   none (skipped)"
+} elseif ($SharedFabric) {
   Write-Output "  Fabric mode:   shared ($SharedFabricCapacityName in $SharedFabricResourceGroup)"
 } else {
   Write-Output "  Fabric mode:   per-student (from bicepparam)"
@@ -149,12 +159,32 @@ for ($index = 1; $index -le $StudentCount; $index++) {
   $vmAdminPassword = New-RandomPassword
   # Escape embedded quotes so the JSON survives PowerShell -> az.cmd argv marshaling on Windows.
   # Without this, the inner quotes are stripped and az sees {key:value,...} instead of {"key":"value",...}.
-  $tagsJson = ((@{
-    env = $envName
-    project = 'cosmos-labs'
-    batch = $batchId
-    student = $studentLabel
-  } | ConvertTo-Json -Compress) -replace '"', '\"')
+  $tagsJson = @{
+  env     = $envName
+  project = 'cosmos-labs'
+  batch   = $batchId
+  student = $studentLabel
+} | ConvertTo-Json -Compress
+
+$tagsFile = Join-Path $OutputDirectory "tags-$batchId-$index.json"
+
+# Write UTF-8 without BOM, compatible with Windows PowerShell 5.1
+[System.IO.File]::WriteAllText(
+  $tagsFile,
+  $tagsJson,
+  [System.Text.UTF8Encoding]::new($false)
+)
+
+# bicepparam's fabricAdminMembers is a placeholder; Fabric capacity creation fails
+# with "Unable to authorize with Azure Active Directory" if it can't resolve a
+# member UPN in this tenant, so override it with the student's own (real) UPN.
+$fabricMembersJson = '[' + ($studentUpn | ConvertTo-Json -Compress) + ']'
+$fabricMembersFile = Join-Path $OutputDirectory "fabric-admins-$batchId-$index.json"
+[System.IO.File]::WriteAllText(
+  $fabricMembersFile,
+  $fabricMembersJson,
+  [System.Text.UTF8Encoding]::new($false)
+)
 
   Write-Output "[$studentLabel] creating Entra user $studentUpn"
   az ad user create `
@@ -183,9 +213,10 @@ for ($index = 1; $index -le $StudentCount; $index++) {
     '--parameters', "vmAdminPassword=$vmAdminPassword",
     '--parameters', "vmComputerName=$vmComputerName",
     '--parameters', "studentOwnerObjectId=$studentObjectId",
-    '--parameters', "tags=$tagsJson"
+    '--parameters', "tags=@$tagsFile",
+    '--parameters', "fabricAdminMembers=@$fabricMembersFile"
   )
-  if ($SharedFabric) {
+  if ($SharedFabric -or $NoFabric) {
     $deployParams += @('--parameters', 'deployFabric=false')
   }
 

@@ -17,7 +17,7 @@ Your RG contains:
 - Cosmos DB serverless account
 - Cosmos DB provisioned-autoscale account
 - Azure AI Foundry account
-  - Chat completions model (gpt-4.1-mini)
+  - Chat completions model (gpt-5-mini)
   - Embeddings model (text-embedding-3-small)
 - Storage account
 - Fabric capacity
@@ -62,7 +62,7 @@ Done.
   FOUNDRY_ENDPOINT            = https://aifoundryl4xyz.services.ai.azure.com/
   EMBEDDINGS_ENDPOINT         = https://aifoundryl4xyz.cognitiveservices.azure.com/
   EMBEDDINGS_KEY              = ***
-  COMPLETIONS_MODEL           = gpt41
+  COMPLETIONS_MODEL           = gpt5mini
   EMBEDDINGS_MODEL            = textembedding3small
 ```
 

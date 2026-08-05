@@ -44,6 +44,9 @@ param vmAdminPassword string
 @description('VM size (D4s_v3 or compatible)')
 param vmSize string
 
+@description('Disk controller type - use NVMe for v5/v6 series sizes that support it')
+param diskControllerType string = 'SCSI'
+
 @description('Computer name for the lab VM')
 param vmComputerName string
 
@@ -101,6 +104,7 @@ module lab './main.resources.bicep' = {
     vmAdminUsername: vmAdminUsername
     vmAdminPassword: vmAdminPassword
     vmSize: vmSize
+    diskControllerType: diskControllerType
     vmComputerName: vmComputerName
     applyVmSecurityType: applyVmSecurityType
     foundryDeploymentName: foundryDeploymentName

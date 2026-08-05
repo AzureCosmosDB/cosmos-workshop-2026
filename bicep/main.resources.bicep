@@ -42,6 +42,9 @@ param vmAdminPassword string
 @description('VM size (D4s_v3 or compatible)')
 param vmSize string
 
+@description('Disk controller type - use NVMe for v5/v6 series sizes that support it')
+param diskControllerType string = 'SCSI'
+
 @description('Computer name for the lab VM')
 param vmComputerName string
 
@@ -198,6 +201,7 @@ module vm './modules/vm.bicep' = {
     vmName: vmName
     vmComputerName: vmComputerName
     vmSize: vmSize
+    diskControllerType: diskControllerType
     adminUsername: vmAdminUsername
     adminPassword: vmAdminPassword
     nicId: networking.outputs.nicId

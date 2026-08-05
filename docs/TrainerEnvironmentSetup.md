@@ -44,7 +44,7 @@ For each student, the script creates:
 - **All workshop resources inside that RG**, deployed by [main.bicep](../bicep/main.bicep):
   - Cosmos DB serverless account (`cosmosl{N}<unique>`)
   - Cosmos DB provisioned-autoscale account with two containers (`OrdersHot`, `OrdersComposite`), each set to autoscale 100–1000 RU (`cosmos-provisioned-l{N}<unique>`)
-  - Azure AI Foundry account with `gpt-4.1-mini` chat deployment and `text-embedding-3-small` embeddings (`aifoundryl{N}<unique>`)
+  - Azure AI Foundry account with `gpt-5-mini` chat deployment and `text-embedding-3-small` embeddings (`aifoundryl{N}<unique>`)
   - Storage account (`stl{N}<unique>`)
   - Microsoft Fabric capacity, **F2 SKU per student** — only when `deployFabric=true` (default in single-user test mode; omitted in batch mode via `-SharedFabric`). See [Cost considerations](#cost-considerations)
   - Lab VM (`Standard_D4s_v3`, Windows, computer name `cosmos-lab{N}`) with public IP + NSG + VNet
@@ -198,7 +198,7 @@ After a successful run, each `lab-dev{N}-{batchId}` resource group should contai
 | Resource group | `lab-dev{N}-{batchId}` | Student is Owner |
 | Cosmos DB (serverless) | `cosmosl{N}<unique>` | Used by labs 1B, 1D1, 1D2, 2*, 4A |
 | Cosmos DB (provisioned) | `cosmos-provisioned-l{N}<unique>` | Used by lab 1E (partition-key metrics demo) |
-| AI Foundry account | `aifoundryl{N}<unique>` | Hosts both chat (`gpt41`) and embedding (`textembedding3small`) deployments. Student is pre-granted **Cognitive Services Contributor** + **Cognitive Services OpenAI Contributor** on this account at provisioning. Lab 1B grants the same two roles again as a teaching exercise (the duplicate assignments are idempotent no-ops) |
+| AI Foundry account | `aifoundryl{N}<unique>` | Hosts both chat (`gpt5mini`) and embedding (`textembedding3small`) deployments. Student is pre-granted **Cognitive Services Contributor** + **Cognitive Services OpenAI Contributor** on this account at provisioning. Lab 1B grants the same two roles again as a teaching exercise (the duplicate assignments are idempotent no-ops) |
 | Storage account | `stl{N}<unique>` | General-purpose |
 | Fabric capacity | `fabricl{N}<unique>` | **Single-user test mode only.** F2 SKU. Omitted under `-SharedFabric` |
 | VNet / Subnet / NSG / PIP / NIC | per VM | Networking for the lab VM |
@@ -302,7 +302,7 @@ The script is idempotent — re-run for the same roster to retry failed rows. Su
 ### Deployment quota issues
 
 - **VM SKU not available:** Change `vmSize` in [main.bicepparam](../bicep/main.bicepparam).
-- **Foundry model quota exceeded:** Each student needs `gpt-4.1-mini` + `text-embedding-3-small` TPM. Default is 1 TPM each; large batches in one region exhaust quota. Request an increase or split across regions.
+- **Foundry model quota exceeded:** Each student needs `gpt-5-mini` + `text-embedding-3-small` TPM. Default is 1 TPM each; large batches in one region exhaust quota. Request an increase or split across regions.
 - **Fabric capacity quota:** Per-region F-SKU caps may block large shared capacities or many per-student F2s in single-user mode.
 
 ### Bicep param drift

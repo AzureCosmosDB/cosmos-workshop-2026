@@ -25,6 +25,9 @@ param modelName string
 @description('Chat model version')
 param modelVersion string
 
+@description('Chat model deployment SKU (GlobalStandard is required for newer models that no longer offer regional Standard)')
+param modelSkuName string = 'GlobalStandard'
+
 @description('Embedding model deployment name')
 param embeddingDeploymentName string
 
@@ -73,7 +76,7 @@ resource chatModelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2
   parent: aiFoundryAccount
   name: deploymentName
   sku: {
-    name: 'Standard'
+    name: modelSkuName
     capacity: 1
   }
   properties: {
