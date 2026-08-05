@@ -1,9 +1,9 @@
 using './main.bicep'
 
 param envName = 'lab'
-param location = 'westus'
+param location = 'westus2'
 param resourceGroupName = 'lab-dev4'
-param fabricRegion = 'westus'
+param fabricRegion = 'westus2'
 param fabricSkuName = 'F2'
 param deployFabric = true
 param deployFoundry = true
@@ -14,7 +14,7 @@ param vmAdminUsername = 'lab_user1'
 param vmAdminPassword = '*****TODO*****'
 param vmComputerName = 'cosmos-lab-t'
 param applyVmSecurityType = false
-param vmSize = 'Standard_D4s_v5'  // v6 is NVMe-only; base-win11-gen2 image only supports SCSI
+param vmSize = 'Standard_DC4ads_v5'  // AMD v5, SCSI-compatible; swapped from D4s_v5 due to capacity restrictions in westus
 param diskControllerType = 'SCSI'
 param foundryDeploymentName = 'gpt5mini'
 param foundryModelName = 'gpt-5-mini'
