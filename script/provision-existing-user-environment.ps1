@@ -34,6 +34,9 @@ param(
   [switch]$NoFabric,
 
   [Parameter(Mandatory = $false)]
+  [bool]$IsDocDB = $false,
+
+  [Parameter(Mandatory = $false)]
   [string]$SharedFabricResourceGroup = 'lab-shared-fabric',
 
   [Parameter(Mandatory = $false)]
@@ -137,6 +140,10 @@ if (-not $VmAdminUsername) {
 $deploymentName = "$ResourceGroupName-$timestamp"
 $vmAdminPassword = New-RandomPassword
 $csvPath = Join-Path $OutputDirectory "student-$ResourceGroupName-$timestamp.csv"
+$vnetName = "$EnvName-vnet"
+$subnetName = "$EnvName-subnet"
+$existingSubnetId = [string](& az network vnet subnet show --resource-group $ResourceGroupName --vnet-name $vnetName --name $subnetName --query id -o tsv 2>$null)
+$useExistingVnet = $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($existingSubnetId)
 
 $sharedFabricCapacityId = $null
 if ($SharedFabric) {
@@ -154,6 +161,8 @@ Write-Output "Provisioning environment for existing user."
 Write-Output "  User:            $UserPrincipalName"
 Write-Output "  Resource group:  $ResourceGroupName"
 Write-Output "  Location:        $Location"
+Write-Output "  Database mode:   $(if ($IsDocDB) { 'DocumentDB' } else { 'Cosmos DB for NoSQL' })"
+Write-Output "  Network mode:    $(if ($useExistingVnet) { "reuse existing ($vnetName)" } else { 'create new' })"
 if ($NoFabric) {
   Write-Output "  Fabric mode:     none (skipped)"
 } elseif ($SharedFabric) {
@@ -200,6 +209,8 @@ $deployParams = @(
   '--parameters', "vmAdminPassword=$vmAdminPassword",
   '--parameters', "vmComputerName=$VmComputerName",
   '--parameters', "studentOwnerObjectId=$studentObjectId",
+  '--parameters', "isDocDB=$($IsDocDB.ToString().ToLowerInvariant())",
+  '--parameters', "useExistingVnet=$($useExistingVnet.ToString().ToLowerInvariant())",
   '--parameters', "tags=@$tagsFile",
   '--parameters', "fabricAdminMembers=@$fabricMembersFile"
 )
@@ -232,19 +243,21 @@ $outputsJson = az deployment sub show --name $deploymentName --query properties.
 Assert-LastAzCommand -FailureMessage "Failed to read outputs for deployment '$deploymentName'."
 $outputs = $outputsJson | ConvertFrom-Json
 
-$cosmosServerlessName = $outputs.cosmosAccountName.value
 $mirroringRbacFailed = $false
-Write-Output "granting Cosmos mirroring RBAC on $cosmosServerlessName"
-try {
-  & (Join-Path $PSScriptRoot 'Set-CosmosMirroringRbac.ps1') `
-    -SubscriptionId $activeSubscriptionId `
-    -ResourceGroup $ResourceGroupName `
-    -AccountName $cosmosServerlessName `
-    -PrincipalId $studentObjectId
-} catch {
-  Write-Warning "Cosmos mirroring RBAC failed: $($_.Exception.Message)"
-  Write-Warning "  Re-run: ./script/Set-CosmosMirroringRbac.ps1 -SubscriptionId $activeSubscriptionId -ResourceGroup $ResourceGroupName -AccountName $cosmosServerlessName -PrincipalId $studentObjectId"
-  $mirroringRbacFailed = $true
+if (-not $IsDocDB) {
+  $cosmosServerlessName = $outputs.cosmosAccountName.value
+  Write-Output "granting Cosmos mirroring RBAC on $cosmosServerlessName"
+  try {
+    & (Join-Path $PSScriptRoot 'Set-CosmosMirroringRbac.ps1') `
+      -SubscriptionId $activeSubscriptionId `
+      -ResourceGroup $ResourceGroupName `
+      -AccountName $cosmosServerlessName `
+      -PrincipalId $studentObjectId
+  } catch {
+    Write-Warning "Cosmos mirroring RBAC failed: $($_.Exception.Message)"
+    Write-Warning "  Re-run: ./script/Set-CosmosMirroringRbac.ps1 -SubscriptionId $activeSubscriptionId -ResourceGroup $ResourceGroupName -AccountName $cosmosServerlessName -PrincipalId $studentObjectId"
+    $mirroringRbacFailed = $true
+  }
 }
 
 $row = [ordered]@{
@@ -259,6 +272,7 @@ $row = [ordered]@{
   VmAdminPassword          = $vmAdminPassword
   CosmosServerlessAccount  = $outputs.cosmosAccountName.value
   CosmosProvisionedAccount = $outputs.cosmosProvisionedAccountName.value
+  DocumentDbCluster        = $outputs.documentDbClusterName.value
   FoundryAccount           = $outputs.foundryAccountName.value
   StorageAccount           = $outputs.storageAccountName.value
   EnvName                  = $EnvName

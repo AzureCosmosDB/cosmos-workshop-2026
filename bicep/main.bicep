@@ -29,6 +29,9 @@ param deployFabric bool = true
 @description('Deploy Azure AI Foundry resources')
 param deployFoundry bool = true
 
+@description('Deploy Azure DocumentDB instead of Cosmos DB for NoSQL accounts, databases, and containers.')
+param isDocDB bool = false
+
 @description('Email addresses of Fabric capacity administrators')
 @minLength(1)
 param fabricAdminMembers array
@@ -86,6 +89,9 @@ param tags object
 @description('Optional Entra object ID for the student who should be granted Owner on this resource group')
 param studentOwnerObjectId string = ''
 
+@description('Use the existing workshop VNet and subnet without updating them.')
+param useExistingVnet bool = false
+
 // ========== HELPERS ======
 
 resource labResourceGroup 'Microsoft.Resources/resourceGroups@2025-04-01' = {
@@ -103,6 +109,7 @@ module lab './main.resources.bicep' = {
     fabricSkuName: fabricSkuName
     deployFabric: deployFabric
     deployFoundry: deployFoundry
+    isDocDB: isDocDB
     fabricAdminMembers: fabricAdminMembers
     vmAdminUsername: vmAdminUsername
     vmAdminPassword: vmAdminPassword
@@ -121,6 +128,7 @@ module lab './main.resources.bicep' = {
     aiFoundryProjectName: aiFoundryProjectName
     tags: tags
     studentOwnerObjectId: studentOwnerObjectId
+    useExistingVnet: useExistingVnet
   }
 }
 
@@ -130,6 +138,7 @@ output cosmosDbEndpoint string = lab.outputs.cosmosDbEndpoint
 output provisionedCosmosEndpoint string = lab.outputs.provisionedCosmosEndpoint
 output provisionedCosmosThroughputMode string = lab.outputs.provisionedCosmosThroughputMode
 output provisionedCosmosMaxRU int = lab.outputs.provisionedCosmosMaxRU
+output documentDbConnectionString string = lab.outputs.documentDbConnectionString
 output aiFoundryEndpoint string = lab.outputs.aiFoundryEndpoint
 output aiFoundryProjectName string = lab.outputs.aiFoundryProjectName
 output chatDeploymentName string = lab.outputs.chatDeploymentName
@@ -141,6 +150,7 @@ output storageAccountBlobEndpoint string = lab.outputs.storageAccountBlobEndpoin
 output fabricCapacityId string = lab.outputs.fabricCapacityId
 output cosmosAccountName string = lab.outputs.cosmosAccountName
 output cosmosProvisionedAccountName string = lab.outputs.cosmosProvisionedAccountName
+output documentDbClusterName string = lab.outputs.documentDbClusterName
 output foundryAccountName string = lab.outputs.foundryAccountName
 output storageAccountName string = lab.outputs.storageAccountName
 output vmName string = lab.outputs.vmName

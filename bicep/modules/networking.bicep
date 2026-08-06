@@ -10,6 +10,9 @@ param envName string
 @description('Unique suffix used for the public IP DNS label')
 param uniqueSuffix string
 
+@description('Use the existing workshop VNet and subnet without updating them.')
+param useExistingVnet bool = false
+
 var publicIpName = 'lab-vm-public-ip'
 var nsgName = '${envName}-nsg'
 var vnetName = '${envName}-vnet'
@@ -54,7 +57,7 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2022-05-01' = {
   }
 }
 
-resource vnet 'Microsoft.Network/virtualNetworks@2022-05-01' = {
+resource vnet 'Microsoft.Network/virtualNetworks@2022-05-01' = if (!useExistingVnet) {
   name: vnetName
   location: location
   properties: {
@@ -91,12 +94,13 @@ resource nic 'Microsoft.Network/networkInterfaces@2022-11-01' = {
             }
           }
           subnet: {
-            id: '${vnet.id}/subnets/${subnetName}'
+            id: resourceId('Microsoft.Network/virtualNetworks/subnets', vnetName, subnetName)
           }
         }
       }
     ]
   }
+  dependsOn: useExistingVnet ? [] : [vnet]
 }
 
 output nicId string = nic.id

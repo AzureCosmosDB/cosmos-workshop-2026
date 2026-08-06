@@ -27,6 +27,9 @@ param deployFabric bool = true
 @description('Deploy Azure AI Foundry resources')
 param deployFoundry bool = true
 
+@description('Deploy Azure DocumentDB instead of Cosmos DB for NoSQL accounts, databases, and containers.')
+param isDocDB bool = false
+
 @description('Email addresses of Fabric capacity administrators')
 @minLength(1)
 param fabricAdminMembers array
@@ -84,11 +87,15 @@ param tags object
 @description('Optional Entra object ID for the student who should be granted Owner on this resource group')
 param studentOwnerObjectId string = ''
 
+@description('Use the existing workshop VNet and subnet without updating them.')
+param useExistingVnet bool = false
+
 // ========== NAMING ======
 
 var uniqueSuffix = toLower(uniqueString(resourceGroup().id))
 var cosmosDbName = 'cosmos${envName}${uniqueSuffix}'
 var cosmosDbProvisionedName = 'cosmos-provisioned-${envName}${uniqueSuffix}'
+var documentDbName = 'docdb-${envName}-${uniqueSuffix}'
 var aiFoundryName = 'aifoundry${envName}${uniqueSuffix}'
 var storageName = 'st${envName}${uniqueSuffix}'
 var fabricCapacityName = 'fabric${envName}${uniqueSuffix}'
@@ -103,6 +110,7 @@ module networking './modules/networking.bicep' = {
     location: location
     envName: envName
     uniqueSuffix: uniqueSuffix
+    useExistingVnet: useExistingVnet
   }
 }
 
@@ -120,7 +128,7 @@ resource studentOwnerAssignment 'Microsoft.Authorization/roleAssignments@2022-04
 
 // ========== COSMOS DB ======
 
-module cosmosServerless './modules/cosmosdb.bicep' = {
+module cosmosServerless './modules/cosmosdb.bicep' = if (!isDocDB) {
   name: 'cosmos-serverless'
   params: {
     accountName: cosmosDbName
@@ -130,7 +138,7 @@ module cosmosServerless './modules/cosmosdb.bicep' = {
   }
 }
 
-module cosmosProvisioned './modules/cosmosdb.provisioned.bicep' = {
+module cosmosProvisioned './modules/cosmosdb.provisioned.bicep' = if (!isDocDB) {
   name: 'provisioned-cosmos'
   params: {
     accountName: cosmosDbProvisionedName
@@ -141,6 +149,17 @@ module cosmosProvisioned './modules/cosmosdb.provisioned.bicep' = {
     }
     autoScaleMaxRU: 1000
     studentOwnerObjectId: studentOwnerObjectId
+  }
+}
+
+module documentDb './modules/documentdb.bicep' = if (isDocDB) {
+  name: 'documentdb'
+  params: {
+    clusterName: documentDbName
+    location: location
+    adminUsername: vmAdminUsername
+    adminPassword: vmAdminPassword
+    tags: tags
   }
 }
 
@@ -232,10 +251,11 @@ module vm './modules/vm.bicep' = {
 
 // ========== OUTPUTS ======
 
-output cosmosDbEndpoint string = cosmosServerless.outputs.endpoint
-output provisionedCosmosEndpoint string = cosmosProvisioned.outputs.accountEndpoint
-output provisionedCosmosThroughputMode string = cosmosProvisioned.outputs.throughputMode
-output provisionedCosmosMaxRU int = cosmosProvisioned.outputs.maxAutoScaleRU
+output cosmosDbEndpoint string = isDocDB ? '' : cosmosServerless!.outputs.endpoint
+output provisionedCosmosEndpoint string = isDocDB ? '' : cosmosProvisioned!.outputs.accountEndpoint
+output provisionedCosmosThroughputMode string = isDocDB ? '' : cosmosProvisioned!.outputs.throughputMode
+output provisionedCosmosMaxRU int = isDocDB ? 0 : cosmosProvisioned!.outputs.maxAutoScaleRU
+output documentDbConnectionString string = isDocDB ? documentDb!.outputs.connectionString : ''
 output aiFoundryEndpoint string = deployFoundry ? foundry!.outputs.endpoint : ''
 output aiFoundryProjectName string = deployFoundry ? foundry!.outputs.projectName : ''
 output chatDeploymentName string = deployFoundry ? foundry!.outputs.deploymentName : ''
@@ -245,8 +265,9 @@ output vmPublicIpAddress string = networking.outputs.publicIpAddress
 output vmAdminUsernameOut string = vmAdminUsername
 output storageAccountBlobEndpoint string = storageAccount.properties.primaryEndpoints.blob
 output fabricCapacityId string = deployFabric ? fabric!.outputs.capacityId : ''
-output cosmosAccountName string = cosmosDbName
-output cosmosProvisionedAccountName string = cosmosDbProvisionedName
+output cosmosAccountName string = isDocDB ? '' : cosmosDbName
+output cosmosProvisionedAccountName string = isDocDB ? '' : cosmosDbProvisionedName
+output documentDbClusterName string = isDocDB ? documentDb!.outputs.clusterName : ''
 output foundryAccountName string = deployFoundry ? aiFoundryName : ''
 output storageAccountName string = storageName
 output vmName string = vmName

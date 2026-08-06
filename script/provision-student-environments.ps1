@@ -25,6 +25,9 @@ param(
   [switch]$NoFabric,
 
   [Parameter(Mandatory = $false)]
+  [bool]$IsDocDB = $false,
+
+  [Parameter(Mandatory = $false)]
   [string]$SharedFabricResourceGroup = 'lab-shared-fabric',
 
   [Parameter(Mandatory = $false)]
@@ -135,6 +138,7 @@ Write-Output "Provisioning $StudentCount student environment(s)."
 Write-Output "  Batch ID:      $batchId"
 Write-Output "  Tenant domain: $tenantDomain"
 Write-Output "  Location:      $Location"
+Write-Output "  Database mode: $(if ($IsDocDB) { 'DocumentDB' } else { 'Cosmos DB for NoSQL' })"
 if ($NoFabric) {
   Write-Output "  Fabric mode:   none (skipped)"
 } elseif ($SharedFabric) {
@@ -157,6 +161,10 @@ for ($index = 1; $index -le $StudentCount; $index++) {
   $studentUpn = "$studentAlias@$tenantDomain"
   $studentPassword = New-RandomPassword
   $vmAdminPassword = New-RandomPassword
+  $vnetName = "$envName-vnet"
+  $subnetName = "$envName-subnet"
+  $existingSubnetId = [string](& az network vnet subnet show --resource-group $resourceGroupName --vnet-name $vnetName --name $subnetName --query id -o tsv 2>$null)
+  $useExistingVnet = $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($existingSubnetId)
   # Escape embedded quotes so the JSON survives PowerShell -> az.cmd argv marshaling on Windows.
   # Without this, the inner quotes are stripped and az sees {key:value,...} instead of {"key":"value",...}.
   $tagsJson = @{
@@ -213,6 +221,8 @@ $fabricMembersFile = Join-Path $OutputDirectory "fabric-admins-$batchId-$index.j
     '--parameters', "vmAdminPassword=$vmAdminPassword",
     '--parameters', "vmComputerName=$vmComputerName",
     '--parameters', "studentOwnerObjectId=$studentObjectId",
+    '--parameters', "isDocDB=$($IsDocDB.ToString().ToLowerInvariant())",
+    '--parameters', "useExistingVnet=$($useExistingVnet.ToString().ToLowerInvariant())",
     '--parameters', "tags=@$tagsFile",
     '--parameters', "fabricAdminMembers=@$fabricMembersFile"
   )
@@ -245,18 +255,20 @@ $fabricMembersFile = Join-Path $OutputDirectory "fabric-admins-$batchId-$index.j
   Assert-LastAzCommand -FailureMessage "Failed to read outputs for deployment '$deploymentName'."
   $outputs = $outputsJson | ConvertFrom-Json
 
-  $cosmosServerlessName = $outputs.cosmosAccountName.value
-  Write-Output "[$studentLabel] granting Cosmos mirroring RBAC on $cosmosServerlessName"
-  try {
-    & (Join-Path $PSScriptRoot 'Set-CosmosMirroringRbac.ps1') `
-      -SubscriptionId $activeSubscriptionId `
-      -ResourceGroup $resourceGroupName `
-      -AccountName $cosmosServerlessName `
-      -PrincipalId $studentObjectId
-  } catch {
-    Write-Warning "[$studentLabel] Cosmos mirroring RBAC failed: $($_.Exception.Message)"
-    Write-Warning "  Re-run: ./script/Set-CosmosMirroringRbac.ps1 -SubscriptionId $activeSubscriptionId -ResourceGroup $resourceGroupName -AccountName $cosmosServerlessName -PrincipalId $studentObjectId"
-    $mirroringRbacFailures.Add($studentLabel) | Out-Null
+  if (-not $IsDocDB) {
+    $cosmosServerlessName = $outputs.cosmosAccountName.value
+    Write-Output "[$studentLabel] granting Cosmos mirroring RBAC on $cosmosServerlessName"
+    try {
+      & (Join-Path $PSScriptRoot 'Set-CosmosMirroringRbac.ps1') `
+        -SubscriptionId $activeSubscriptionId `
+        -ResourceGroup $resourceGroupName `
+        -AccountName $cosmosServerlessName `
+        -PrincipalId $studentObjectId
+    } catch {
+      Write-Warning "[$studentLabel] Cosmos mirroring RBAC failed: $($_.Exception.Message)"
+      Write-Warning "  Re-run: ./script/Set-CosmosMirroringRbac.ps1 -SubscriptionId $activeSubscriptionId -ResourceGroup $resourceGroupName -AccountName $cosmosServerlessName -PrincipalId $studentObjectId"
+      $mirroringRbacFailures.Add($studentLabel) | Out-Null
+    }
   }
 
   $row = [ordered]@{
@@ -273,6 +285,7 @@ $fabricMembersFile = Join-Path $OutputDirectory "fabric-admins-$batchId-$index.j
     VmAdminPassword = $vmAdminPassword
     CosmosServerlessAccount = $outputs.cosmosAccountName.value
     CosmosProvisionedAccount = $outputs.cosmosProvisionedAccountName.value
+    DocumentDbCluster = $outputs.documentDbClusterName.value
     FoundryAccount = $outputs.foundryAccountName.value
     StorageAccount = $outputs.storageAccountName.value
     EnvName = $envName
