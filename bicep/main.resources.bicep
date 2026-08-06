@@ -69,6 +69,9 @@ param foundryEmbeddingModelName string
 @description('Azure AI Foundry embedding model version')
 param foundryEmbeddingModelVersion string
 
+@description('Azure AI Foundry embedding model deployment SKU (GlobalStandard has the widest regional availability)')
+param foundryEmbeddingSkuName string = 'GlobalStandard'
+
 @description('Azure AI Foundry account SKU (S0 = standard)')
 param foundrySkuName string
 
@@ -123,6 +126,7 @@ module cosmosServerless './modules/cosmosdb.bicep' = {
     accountName: cosmosDbName
     location: location
     tags: tags
+    studentOwnerObjectId: studentOwnerObjectId
   }
 }
 
@@ -136,6 +140,7 @@ module cosmosProvisioned './modules/cosmosdb.provisioned.bicep' = {
       tags: tags
     }
     autoScaleMaxRU: 1000
+    studentOwnerObjectId: studentOwnerObjectId
   }
 }
 
@@ -152,10 +157,24 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2022-05-01' = {
   properties: {
     accessTier: 'Hot'
     supportsHttpsTrafficOnly: true
+    allowSharedKeyAccess: false
     networkAcls: {
       bypass: 'AzureServices'
       defaultAction: 'Allow'
     }
+  }
+}
+
+// RG-level Owner does not include Storage blob data-plane actions; grant them explicitly.
+var storageBlobDataContributorRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+
+resource studentStorageBlobDataContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(studentOwnerObjectId)) {
+  scope: storageAccount
+  name: guid(storageAccount.id, studentOwnerObjectId, storageBlobDataContributorRoleId)
+  properties: {
+    roleDefinitionId: storageBlobDataContributorRoleId
+    principalId: studentOwnerObjectId
+    principalType: 'User'
   }
 }
 
@@ -175,6 +194,7 @@ module foundry './modules/foundry.bicep' = if (deployFoundry) {
     embeddingDeploymentName: foundryEmbeddingDeploymentName
     embeddingModelName: foundryEmbeddingModelName
     embeddingModelVersion: foundryEmbeddingModelVersion
+    embeddingSkuName: foundryEmbeddingSkuName
     studentOwnerObjectId: studentOwnerObjectId
   }
 }
@@ -213,25 +233,17 @@ module vm './modules/vm.bicep' = {
 // ========== OUTPUTS ======
 
 output cosmosDbEndpoint string = cosmosServerless.outputs.endpoint
-#disable-next-line outputs-should-not-contain-secrets
-output cosmosDbPrimaryKey string = cosmosServerless.outputs.primaryKey
 output provisionedCosmosEndpoint string = cosmosProvisioned.outputs.accountEndpoint
-#disable-next-line outputs-should-not-contain-secrets
-output provisionedCosmosPrimaryKey string = cosmosProvisioned.outputs.primaryKey
 output provisionedCosmosThroughputMode string = cosmosProvisioned.outputs.throughputMode
 output provisionedCosmosMaxRU int = cosmosProvisioned.outputs.maxAutoScaleRU
 output aiFoundryEndpoint string = deployFoundry ? foundry!.outputs.endpoint : ''
 output aiFoundryProjectName string = deployFoundry ? foundry!.outputs.projectName : ''
 output chatDeploymentName string = deployFoundry ? foundry!.outputs.deploymentName : ''
 output embeddingDeploymentName string = deployFoundry ? foundry!.outputs.embeddingDeploymentName : ''
-#disable-next-line outputs-should-not-contain-secrets
-output aiFoundryPrimaryKey string = deployFoundry ? foundry!.outputs.primaryKey : ''
 output vmPublicIp string = networking.outputs.publicIpFqdn
 output vmPublicIpAddress string = networking.outputs.publicIpAddress
 output vmAdminUsernameOut string = vmAdminUsername
 output storageAccountBlobEndpoint string = storageAccount.properties.primaryEndpoints.blob
-#disable-next-line outputs-should-not-contain-secrets
-output storageAccountKey string = storageAccount.listKeys().keys[0].value
 output fabricCapacityId string = deployFabric ? fabric!.outputs.capacityId : ''
 output cosmosAccountName string = cosmosDbName
 output cosmosProvisionedAccountName string = cosmosDbProvisionedName

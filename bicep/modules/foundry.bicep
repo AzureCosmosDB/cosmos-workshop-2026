@@ -37,6 +37,9 @@ param embeddingModelName string
 @description('Embedding model version')
 param embeddingModelVersion string
 
+@description('Embedding model deployment SKU (GlobalStandard has the widest regional availability)')
+param embeddingSkuName string = 'GlobalStandard'
+
 @description('Optional Entra object ID to grant Cognitive Services data-plane access on this account')
 param studentOwnerObjectId string = ''
 
@@ -58,7 +61,7 @@ resource aiFoundryAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
     allowProjectManagement: true
     customSubDomainName: accountName
     publicNetworkAccess: 'Enabled'
-    disableLocalAuth: false
+    disableLocalAuth: true
   }
 }
 
@@ -94,7 +97,7 @@ resource embeddingModelDeployment 'Microsoft.CognitiveServices/accounts/deployme
   parent: aiFoundryAccount
   name: embeddingDeploymentName
   sku: {
-    name: 'Standard'
+    name: embeddingSkuName
     capacity: 1
   }
   properties: {
@@ -136,5 +139,3 @@ output endpoint string = aiFoundryAccount.properties.endpoint
 output projectName string = aiFoundryProject.name
 output deploymentName string = chatModelDeployment.name
 output embeddingDeploymentName string = embeddingModelDeployment.name
-#disable-next-line outputs-should-not-contain-secrets
-output primaryKey string = aiFoundryAccount.listKeys().key1

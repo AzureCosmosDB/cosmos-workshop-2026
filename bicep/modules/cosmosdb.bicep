@@ -10,6 +10,12 @@ param location string
 @description('Tags applied to the account')
 param tags object
 
+@description('Optional Entra object ID to grant Cosmos DB data-plane (SQL) access on this account')
+param studentOwnerObjectId string = ''
+
+// Cosmos DB's built-in "Cosmos DB Built-in Data Contributor" role, scoped per-account (not a Microsoft.Authorization role).
+var dataContributorRoleId = '${cosmosAccount.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002'
+
 resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
   name: accountName
   location: location
@@ -18,6 +24,7 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
   properties: {
     databaseAccountOfferType: 'Standard'
     publicNetworkAccess: 'Enabled'
+    disableLocalAuth: true
     backupPolicy: {
       type: 'Continuous'
       continuousModeProperties: {
@@ -40,6 +47,17 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
         locationName: location
       }
     ]
+  }
+}
+
+// RG-level Owner does not include Cosmos DB SQL data-plane actions; grant them explicitly.
+resource studentDataContributorAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-11-15' = if (!empty(studentOwnerObjectId)) {
+  parent: cosmosAccount
+  name: guid(cosmosAccount.id, studentOwnerObjectId, dataContributorRoleId)
+  properties: {
+    roleDefinitionId: dataContributorRoleId
+    principalId: studentOwnerObjectId
+    scope: cosmosAccount.id
   }
 }
 
@@ -308,5 +326,3 @@ resource modelingEmbedContainers 'Microsoft.DocumentDB/databaseAccounts/sqlDatab
 }]
 
 output endpoint string = cosmosAccount.properties.documentEndpoint
-#disable-next-line outputs-should-not-contain-secrets
-output primaryKey string = cosmosAccount.listKeys().primaryMasterKey

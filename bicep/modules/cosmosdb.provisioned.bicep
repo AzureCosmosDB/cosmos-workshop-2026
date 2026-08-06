@@ -7,6 +7,12 @@ param location string
 param common object
 param autoScaleMaxRU int = 4000
 
+@description('Optional Entra object ID to grant Cosmos DB data-plane (SQL) access on this account')
+param studentOwnerObjectId string = ''
+
+// Cosmos DB's built-in "Cosmos DB Built-in Data Contributor" role, scoped per-account (not a Microsoft.Authorization role).
+var dataContributorRoleId = '${dbAccount.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002'
+
 resource dbAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
   name: accountName
   location: location
@@ -15,6 +21,7 @@ resource dbAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
   properties: {
     databaseAccountOfferType: 'Standard'
     publicNetworkAccess: 'Enabled'
+    disableLocalAuth: true
     capabilities: [
       { name: 'EnableNoSQLVectorSearch' }
     ]
@@ -29,6 +36,17 @@ resource dbAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
       }
     ]
     enableFreeTier: false
+  }
+}
+
+// RG-level Owner does not include Cosmos DB SQL data-plane actions; grant them explicitly.
+resource studentDataContributorAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-11-15' = if (!empty(studentOwnerObjectId)) {
+  parent: dbAccount
+  name: guid(dbAccount.id, studentOwnerObjectId, dataContributorRoleId)
+  properties: {
+    roleDefinitionId: dataContributorRoleId
+    principalId: studentOwnerObjectId
+    scope: dbAccount.id
   }
 }
 
@@ -100,7 +118,5 @@ resource ordersCompositeContainer 'Microsoft.DocumentDB/databaseAccounts/sqlData
 
 output accountName string = dbAccount.name
 output accountEndpoint string = dbAccount.properties.documentEndpoint
-#disable-next-line outputs-should-not-contain-secrets
-output primaryKey string = dbAccount.listKeys().primaryMasterKey
 output throughputMode string = 'Provisioned with autoscale'
 output maxAutoScaleRU int = autoScaleMaxRU

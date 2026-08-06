@@ -2,7 +2,8 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$ResourceGroupName,
 
-  [Parameter(Mandatory = $true)]
+  # Defaults to the currently signed-in az identity (user or service principal) when omitted.
+  [Parameter(Mandatory = $false)]
   [string]$UserPrincipalName,
 
   [Parameter(Mandatory = $false)]
@@ -94,20 +95,37 @@ if ($SharedFabric -and $NoFabric) {
   throw '-SharedFabric and -NoFabric are mutually exclusive.'
 }
 
+$usingSignedInIdentity = -not $UserPrincipalName
+if ($usingSignedInIdentity) {
+  $UserPrincipalName = (& az account show --query 'user.name' -o tsv).Trim()
+  Assert-LastAzCommand -FailureMessage 'Failed to read the signed-in az identity. Run az login first, or pass -UserPrincipalName explicitly.'
+}
+
 # Fail fast rather than silently creating a user: this script is for students who already
-# have an Azure AD account and must not provision new Entra identities.
-$studentObjectId = (& az ad user show --id $UserPrincipalName --query id -o tsv 2>$null)
-Assert-LastAzCommand -FailureMessage "User '$UserPrincipalName' was not found in the current tenant. Verify the UPN and that you're signed into the right tenant."
+# have an Azure AD identity and must not provision new Entra identities.
+# Service principals resolve via az ad sp (UserPrincipalName is then the app/client ID); everyone else via az ad user.
+$signedInType = (& az account show --query 'user.type' -o tsv 2>$null)
+if ($usingSignedInIdentity -and $signedInType -and $signedInType.Trim() -eq 'servicePrincipal') {
+  $studentObjectId = (& az ad sp show --id $UserPrincipalName --query id -o tsv 2>$null)
+  Assert-LastAzCommand -FailureMessage "Service principal '$UserPrincipalName' was not found in the current tenant."
+} else {
+  $studentObjectId = (& az ad user show --id $UserPrincipalName --query id -o tsv 2>$null)
+  Assert-LastAzCommand -FailureMessage "User '$UserPrincipalName' was not found in the current tenant. Verify the UPN and that you're signed into the right tenant."
+}
 if (-not $studentObjectId) {
-  throw "Could not resolve object ID for existing user '$UserPrincipalName'."
+  throw "Could not resolve object ID for '$UserPrincipalName'."
 }
 $studentObjectId = $studentObjectId.Trim()
 
 $timestamp = (Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmss')
-# Storage account naming budget is 24 chars total ("st" + envName + 13-char uniqueSuffix),
-# so envName must stay short regardless of the resource group name length.
+# main.bicep's envName param has @maxLength(4); resource-name uniqueness comes from
+# uniqueString(resourceGroup().id) downstream, so envName just needs to be short and stable.
 if (-not $EnvName) {
-  $EnvName = 'e' + $timestamp.Substring(6, 8)
+  $rgAlnum = ($ResourceGroupName -replace '[^a-zA-Z0-9]', '').ToLower()
+  $EnvName = if ($rgAlnum.Length -ge 4) { $rgAlnum.Substring(0, 4) } elseif ($rgAlnum) { $rgAlnum } else { 'std' }
+}
+if ($EnvName.Length -gt 4) {
+  throw "-EnvName '$EnvName' exceeds the 4-character limit enforced by main.bicep's envName parameter."
 }
 if (-not $VmAdminUsername) {
   $alias = ($UserPrincipalName -split '@', 2)[0] -replace '[^a-zA-Z0-9]', ''

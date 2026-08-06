@@ -71,6 +71,9 @@ param foundryEmbeddingModelName string
 @description('Azure AI Foundry embedding model version')
 param foundryEmbeddingModelVersion string
 
+@description('Azure AI Foundry embedding model deployment SKU (GlobalStandard has the widest regional availability)')
+param foundryEmbeddingSkuName string = 'GlobalStandard'
+
 @description('Azure AI Foundry account SKU (S0 = standard)')
 param foundrySkuName string
 
@@ -113,6 +116,7 @@ module lab './main.resources.bicep' = {
     foundryEmbeddingDeploymentName: foundryEmbeddingDeploymentName
     foundryEmbeddingModelName: foundryEmbeddingModelName
     foundryEmbeddingModelVersion: foundryEmbeddingModelVersion
+    foundryEmbeddingSkuName: foundryEmbeddingSkuName
     foundrySkuName: foundrySkuName
     aiFoundryProjectName: aiFoundryProjectName
     tags: tags
@@ -123,25 +127,17 @@ module lab './main.resources.bicep' = {
 // ========== OUTPUTS ======
 
 output cosmosDbEndpoint string = lab.outputs.cosmosDbEndpoint
-#disable-next-line outputs-should-not-contain-secrets
-output cosmosDbPrimaryKey string = lab.outputs.cosmosDbPrimaryKey
 output provisionedCosmosEndpoint string = lab.outputs.provisionedCosmosEndpoint
-#disable-next-line outputs-should-not-contain-secrets
-output provisionedCosmosPrimaryKey string = lab.outputs.provisionedCosmosPrimaryKey
 output provisionedCosmosThroughputMode string = lab.outputs.provisionedCosmosThroughputMode
 output provisionedCosmosMaxRU int = lab.outputs.provisionedCosmosMaxRU
 output aiFoundryEndpoint string = lab.outputs.aiFoundryEndpoint
 output aiFoundryProjectName string = lab.outputs.aiFoundryProjectName
 output chatDeploymentName string = lab.outputs.chatDeploymentName
 output embeddingDeploymentName string = lab.outputs.embeddingDeploymentName
-#disable-next-line outputs-should-not-contain-secrets
-output aiFoundryPrimaryKey string = lab.outputs.aiFoundryPrimaryKey
 output vmPublicIp string = lab.outputs.vmPublicIp
 output vmPublicIpAddress string = lab.outputs.vmPublicIpAddress
 output vmAdminUsernameOut string = lab.outputs.vmAdminUsernameOut
 output storageAccountBlobEndpoint string = lab.outputs.storageAccountBlobEndpoint
-#disable-next-line outputs-should-not-contain-secrets
-output storageAccountKey string = lab.outputs.storageAccountKey
 output fabricCapacityId string = lab.outputs.fabricCapacityId
 output cosmosAccountName string = lab.outputs.cosmosAccountName
 output cosmosProvisionedAccountName string = lab.outputs.cosmosProvisionedAccountName
