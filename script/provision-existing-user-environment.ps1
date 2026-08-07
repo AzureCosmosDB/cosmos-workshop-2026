@@ -13,6 +13,13 @@ param(
   [string]$Location = 'westus',
 
   [Parameter(Mandatory = $false)]
+  [string]$VmSize = 'Standard_D4ds_v7',
+
+  [Parameter(Mandatory = $false)]
+  [ValidateSet('SCSI', 'NVMe')]
+  [string]$DiskControllerType = 'NVMe',
+
+  [Parameter(Mandatory = $false)]
   [string]$EnvName,
 
   [Parameter(Mandatory = $false)]
@@ -44,6 +51,13 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($VmSize -match '_v7$') {
+  if ($DiskControllerType -and $DiskControllerType -ne 'NVMe') {
+    throw "VM size '$VmSize' requires -DiskControllerType NVMe."
+  }
+  $DiskControllerType = 'NVMe'
+}
 
 function Assert-LastAzCommand {
   param([Parameter(Mandatory = $true)][string]$FailureMessage)
@@ -137,6 +151,15 @@ if (-not $VmAdminUsername) {
   $VmAdminUsername = $alias
 }
 
+$vmName = "lab-vm-$EnvName-01"
+$resourceGroupExists = [System.Convert]::ToBoolean((& az group exists --name $ResourceGroupName -o tsv).Trim())
+if ($resourceGroupExists) {
+  $existingDiskControllerType = [string](& az vm list --resource-group $ResourceGroupName --query "[?name=='$vmName'] | [0].storageProfile.diskControllerType" -o tsv)
+  if ($existingDiskControllerType -and $existingDiskControllerType.Trim() -ne $DiskControllerType) {
+    throw "Existing VM '$vmName' uses $($existingDiskControllerType.Trim()), which cannot be converted in place to $DiskControllerType. Use a new resource group to deploy $VmSize."
+  }
+}
+
 $deploymentName = "$ResourceGroupName-$timestamp"
 $vmAdminPassword = New-RandomPassword
 $csvPath = Join-Path $OutputDirectory "student-$ResourceGroupName-$timestamp.csv"
@@ -216,6 +239,12 @@ $deployParams = @(
 )
 if ($SharedFabric -or $NoFabric) {
   $deployParams += @('--parameters', 'deployFabric=false')
+}
+if ($VmSize) {
+  $deployParams += @('--parameters', "vmSize=$VmSize")
+}
+if ($DiskControllerType) {
+  $deployParams += @('--parameters', "diskControllerType=$DiskControllerType")
 }
 
 Write-Output "running what-if for deployment $deploymentName"

@@ -13,6 +13,13 @@ param(
   [string]$Location = 'westus',
 
   [Parameter(Mandatory = $false)]
+  [string]$VmSize,
+
+  [Parameter(Mandatory = $false)]
+  [ValidateSet('SCSI', 'NVMe')]
+  [string]$DiskControllerType,
+
+  [Parameter(Mandatory = $false)]
   [string]$BicepparamFile = (Join-Path $PSScriptRoot '..\bicep\main.bicepparam'),
 
   [Parameter(Mandatory = $false)]
@@ -35,6 +42,13 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($VmSize -match '_v7$') {
+  if ($DiskControllerType -and $DiskControllerType -ne 'NVMe') {
+    throw "VM size '$VmSize' requires -DiskControllerType NVMe."
+  }
+  $DiskControllerType = 'NVMe'
+}
 
 function Assert-LastAzCommand {
   param([Parameter(Mandatory = $true)][string]$FailureMessage)
@@ -161,10 +175,6 @@ for ($index = 1; $index -le $StudentCount; $index++) {
   $studentUpn = "$studentAlias@$tenantDomain"
   $studentPassword = New-RandomPassword
   $vmAdminPassword = New-RandomPassword
-  $vnetName = "$envName-vnet"
-  $subnetName = "$envName-subnet"
-  $existingSubnetId = [string](& az network vnet subnet show --resource-group $resourceGroupName --vnet-name $vnetName --name $subnetName --query id -o tsv 2>$null)
-  $useExistingVnet = $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($existingSubnetId)
   # Escape embedded quotes so the JSON survives PowerShell -> az.cmd argv marshaling on Windows.
   # Without this, the inner quotes are stripped and az sees {key:value,...} instead of {"key":"value",...}.
   $tagsJson = @{
@@ -222,17 +232,26 @@ $fabricMembersFile = Join-Path $OutputDirectory "fabric-admins-$batchId-$index.j
     '--parameters', "vmComputerName=$vmComputerName",
     '--parameters', "studentOwnerObjectId=$studentObjectId",
     '--parameters', "isDocDB=$($IsDocDB.ToString().ToLowerInvariant())",
-    '--parameters', "useExistingVnet=$($useExistingVnet.ToString().ToLowerInvariant())",
     '--parameters', "tags=@$tagsFile",
     '--parameters', "fabricAdminMembers=@$fabricMembersFile"
   )
   if ($SharedFabric -or $NoFabric) {
     $deployParams += @('--parameters', 'deployFabric=false')
   }
+  if ($VmSize) {
+    $deployParams += @('--parameters', "vmSize=$VmSize")
+  }
+  if ($DiskControllerType) {
+    $deployParams += @('--parameters', "diskControllerType=$DiskControllerType")
+  }
 
   Write-Output "[$studentLabel] running what-if for deployment $deploymentName"
   az deployment sub what-if @deployParams --no-pretty-print --only-show-errors | Out-Null
-  Assert-LastAzCommand -FailureMessage "What-if failed for deployment '$deploymentName'."
+  if ($LASTEXITCODE -ne 0) {
+    Write-Warning "[$studentLabel] what-if failed; deleting newly created Entra user $studentUpn"
+    az ad user delete --id $studentUpn --only-show-errors
+    throw "What-if failed for deployment '$deploymentName'."
+  }
 
   # Retry transient ARM failures (e.g., Cognitive Services 'provisioning state is not
   # terminal' races between the AI Foundry account and its child project / model

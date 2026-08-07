@@ -1,4 +1,4 @@
-// vm.bicep - Lab VM definition aligned to exported Azure VM settings
+// vm.bicep - Lab VM definition
 targetScope = 'resourceGroup'
 
 @description('Location for the VM')
@@ -47,9 +47,9 @@ var vmPropertiesBase = {
       deleteOption: 'Delete'
     }
     imageReference: {
-      publisher: 'microsoftvisualstudio'
-      offer: 'windowsplustools'
-      sku: 'base-win11-gen2'
+      publisher: 'MicrosoftWindowsDesktop'
+      offer: 'windows-11'
+      sku: 'win11-24h2-ent'
       version: 'latest'
     }
   }

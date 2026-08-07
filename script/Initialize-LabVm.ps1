@@ -27,6 +27,8 @@ Invoke-Winget -Id 'Microsoft.DotNet.SDK.10'
 
 Invoke-Winget -Id 'Python.Python.3.14'
 
+Invoke-Winget -Id 'Microsoft.VisualStudioCode'
+
 $python = (Get-Command python.exe -ErrorAction SilentlyContinue)?.Source
 if (-not $python) { throw "python.exe not found on PATH after install." }
 
@@ -41,7 +43,7 @@ if ($LASTEXITCODE -ne 0) { throw "pip install failed." }
 $code = (Get-Command code.cmd -ErrorAction SilentlyContinue)?.Source
 if (-not $code) { $code = (Get-Command code -ErrorAction SilentlyContinue)?.Source }
 if (-not $code) {
-  Write-Warning "VS Code CLI ('code') not found on PATH. Open VS Code once to register it, then re-run this script."
+  throw "VS Code CLI ('code') not found on PATH after install."
 }
 else {
   foreach ($ext in @('ms-toolsai.jupyter', 'ms-dotnettools.csharp', 'ms-python.python')) {
