@@ -52,6 +52,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+Import-Module (Join-Path $PSScriptRoot 'Bastion.psm1') -Force
+
 if ($VmSize -match '_v7$') {
   if ($DiskControllerType -and $DiskControllerType -ne 'NVMe') {
     throw "VM size '$VmSize' requires -DiskControllerType NVMe."
@@ -272,8 +274,13 @@ $outputsJson = az deployment sub show --name $deploymentName --query properties.
 Assert-LastAzCommand -FailureMessage "Failed to read outputs for deployment '$deploymentName'."
 $outputs = $outputsJson | ConvertFrom-Json
 
+Write-Output 'creating Bastion shareable link'
+$bastionUri = Get-BastionShareableLink `
+  -BastionId $outputs.bastionId.value `
+  -VmId $outputs.vmId.value
+
 $mirroringRbacFailed = $false
-if (-not $IsDocDB) {
+if (-not $IsDocDB -and -not $NoFabric) {
   $cosmosServerlessName = $outputs.cosmosAccountName.value
   Write-Output "granting Cosmos mirroring RBAC on $cosmosServerlessName"
   try {
@@ -297,6 +304,8 @@ $row = [ordered]@{
   VmComputerName            = $VmComputerName
   VmPublicIp               = $outputs.vmPublicIpAddress.value
   VmPublicFqdn             = $outputs.vmPublicIp.value
+  BastionName              = $outputs.bastionName.value
+  BastionUri               = $bastionUri
   VmAdminUsername          = $VmAdminUsername
   VmAdminPassword          = $vmAdminPassword
   CosmosServerlessAccount  = $outputs.cosmosAccountName.value
@@ -316,6 +325,7 @@ $rowObject | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
 Write-Output ""
 Write-Output "Provisioned environment for $UserPrincipalName."
 Write-Output "Roster written to: $csvPath"
+Write-Output "Bastion shareable URL: $($row.BastionUri)"
 if ($mirroringRbacFailed) {
   Write-Warning "Cosmos mirroring RBAC failed for $UserPrincipalName. Re-apply with script/Set-CosmosMirroringRbac.ps1 before Lab 4B."
 }

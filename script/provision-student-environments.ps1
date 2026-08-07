@@ -43,6 +43,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+Import-Module (Join-Path $PSScriptRoot 'Bastion.psm1') -Force
+
 if ($VmSize -match '_v7$') {
   if ($DiskControllerType -and $DiskControllerType -ne 'NVMe') {
     throw "VM size '$VmSize' requires -DiskControllerType NVMe."
@@ -274,7 +276,12 @@ $fabricMembersFile = Join-Path $OutputDirectory "fabric-admins-$batchId-$index.j
   Assert-LastAzCommand -FailureMessage "Failed to read outputs for deployment '$deploymentName'."
   $outputs = $outputsJson | ConvertFrom-Json
 
-  if (-not $IsDocDB) {
+  Write-Output "[$studentLabel] creating Bastion shareable link"
+  $bastionUri = Get-BastionShareableLink `
+    -BastionId $outputs.bastionId.value `
+    -VmId $outputs.vmId.value
+
+  if (-not $IsDocDB -and -not $NoFabric) {
     $cosmosServerlessName = $outputs.cosmosAccountName.value
     Write-Output "[$studentLabel] granting Cosmos mirroring RBAC on $cosmosServerlessName"
     try {
@@ -300,6 +307,8 @@ $fabricMembersFile = Join-Path $OutputDirectory "fabric-admins-$batchId-$index.j
     VmComputerName = $vmComputerName
     VmPublicIp = $outputs.vmPublicIpAddress.value
     VmPublicFqdn = $outputs.vmPublicIp.value
+    BastionName = $outputs.bastionName.value
+    BastionUri = $bastionUri
     VmAdminUsername = $vmAdminUser
     VmAdminPassword = $vmAdminPassword
     CosmosServerlessAccount = $outputs.cosmosAccountName.value
@@ -318,6 +327,7 @@ $fabricMembersFile = Join-Path $OutputDirectory "fabric-admins-$batchId-$index.j
   }
   $rowObject = [pscustomobject]$row
   $results.Add($rowObject)
+  Write-Output "[$studentLabel] Bastion shareable URL: $($row.BastionUri)"
 
   # Stream this student's row to the roster immediately so a mid-batch failure
   # still leaves a usable record of every student provisioned up to that point.

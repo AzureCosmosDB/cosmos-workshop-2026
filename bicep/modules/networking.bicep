@@ -14,9 +14,12 @@ param uniqueSuffix string
 param useExistingVnet bool = false
 
 var publicIpName = 'lab-vm-public-ip'
+var bastionPublicIpName = '${envName}-bastion-public-ip'
+var bastionName = '${envName}-bastion'
 var nsgName = '${envName}-nsg'
 var vnetName = '${envName}-vnet'
 var subnetName = '${envName}-subnet'
+var bastionSubnetName = 'AzureBastionSubnet'
 var vmName = 'lab-vm-${envName}-01'
 var nicName = '${vmName}Nic'
 var dnsLabelPrefix = toLower('lab-${uniqueSuffix}')
@@ -32,6 +35,17 @@ resource publicIp 'Microsoft.Network/publicIPAddresses@2022-05-01' = {
     dnsSettings: {
       domainNameLabel: dnsLabelPrefix
     }
+  }
+}
+
+resource bastionPublicIp 'Microsoft.Network/publicIPAddresses@2024-05-01' = {
+  name: bastionPublicIpName
+  location: location
+  sku: {
+    name: 'Standard'
+  }
+  properties: {
+    publicIPAllocationMethod: 'Static'
   }
 }
 
@@ -71,8 +85,53 @@ resource vnet 'Microsoft.Network/virtualNetworks@2022-05-01' = if (!useExistingV
           addressPrefix: '10.0.0.0/24'
         }
       }
+      {
+        name: bastionSubnetName
+        properties: {
+          addressPrefix: '10.0.1.0/26'
+        }
+      }
     ]
   }
+}
+
+resource existingVnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = if (useExistingVnet) {
+  name: vnetName
+}
+
+@onlyIfNotExists()
+resource existingBastionSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' = if (useExistingVnet) {
+  parent: existingVnet
+  name: bastionSubnetName
+  properties: {
+    addressPrefix: '10.0.1.0/26'
+  }
+}
+
+resource bastion 'Microsoft.Network/bastionHosts@2024-05-01' = {
+  name: bastionName
+  location: location
+  sku: {
+    name: 'Standard'
+  }
+  properties: {
+    enableShareableLink: true
+    ipConfigurations: [
+      {
+        name: 'bastion-ip-configuration'
+        properties: {
+          privateIPAllocationMethod: 'Dynamic'
+          publicIPAddress: {
+            id: bastionPublicIp.id
+          }
+          subnet: {
+            id: resourceId('Microsoft.Network/virtualNetworks/subnets', vnetName, bastionSubnetName)
+          }
+        }
+      }
+    ]
+  }
+  dependsOn: useExistingVnet ? [existingBastionSubnet] : [vnet]
 }
 
 resource nic 'Microsoft.Network/networkInterfaces@2022-11-01' = {
@@ -106,3 +165,5 @@ resource nic 'Microsoft.Network/networkInterfaces@2022-11-01' = {
 output nicId string = nic.id
 output publicIpFqdn string = publicIp.properties.dnsSettings.fqdn
 output publicIpAddress string = publicIp.properties.ipAddress
+output bastionName string = bastion.name
+output bastionId string = bastion.id

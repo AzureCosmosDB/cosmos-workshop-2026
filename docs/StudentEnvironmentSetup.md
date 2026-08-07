@@ -1,12 +1,15 @@
-# Student Environment Setup
+---
+title: Student Environment Setup
+description: Connect to a provisioned workshop VM through Azure Bastion and configure the lab environment.
+---
 
-> Quick reference for getting your lab environment running. The instructor has pre-provisioned Azure resources needed for the labs. This guide walks you through the steps to connect to your resource environment after you RDP into your VM.
+> Quick reference for getting your lab environment running. The instructor has pre-provisioned Azure resources needed for the labs. This guide walks you through connecting directly to your VM through Azure Bastion in a browser.
 
 ## What you've been given
 
 Your instructor will provide you these values:
 
-- **VM hostname or IP** — what you RDP to
+- **Bastion URI** - shareable link that opens the VM connection page without an Azure Portal sign-in
 - **VM login** — local Windows user (`lab_user{N}`) + password
 - **Entra (Azure AD) login** — `lab_user{N}_<batch>@<tenant>` + temporary password
 
@@ -21,15 +24,19 @@ Your RG contains:
   - Embeddings model (text-embedding-3-small)
 - Storage account
 - Fabric capacity
+- Azure Bastion
 - Lab VM with preloaded tools for executing labs
 
 ---
 
 ## First-time setup
 
-### 1. RDP to the VM
+### 1. Connect through Azure Bastion
 
-Use the hostname/IP your instructor provided, with the VM admin login (`lab_user{N}` + VM password). This is a local Windows account, not your Entra login.
+1. Open the Bastion URI supplied by your instructor. You do not need to sign in to Azure Portal.
+2. Enter the VM admin login (`lab_user{N}` + VM password), then select **Login**.
+
+The shareable link contains no credentials. The VM login is a local Windows account, not your Entra login. Bastion opens the Windows session in your browser, so no local RDP client is required.
 
 ### 2. Sign in to Azure
 

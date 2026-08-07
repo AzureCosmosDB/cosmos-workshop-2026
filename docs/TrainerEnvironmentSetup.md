@@ -1,4 +1,7 @@
-# Trainer Environment Setup Guide
+---
+title: Trainer Environment Setup Guide
+description: Provision, validate, and operate per-student Azure workshop environments.
+---
 
 > Covers the pre-class environment provisioning workflow built around [script/provision-student-environments.ps1](../script/provision-student-environments.ps1) and [bicep/main.bicep](../bicep/main.bicep).
 
@@ -47,7 +50,8 @@ For each student, the script creates:
   - Azure AI Foundry account with `gpt-5-mini` chat deployment and `text-embedding-3-small` embeddings (`aifoundryl{N}<unique>`)
   - Storage account (`stl{N}<unique>`)
   - Microsoft Fabric capacity, **F2 SKU per student** — only when `deployFabric=true` (default in single-user test mode; omitted in batch mode via `-SharedFabric`). See [Cost considerations](#cost-considerations)
-  - Lab VM (`Standard_D4s_v3`, Windows, computer name `cosmos-lab{N}`) with public IP + NSG + VNet
+  - Lab VM (`Standard_D4ds_v7`, Windows, computer name `cosmos-lab{N}`) with public IP + NSG + VNet
+  - Azure Bastion Standard with shareable links, a dedicated public IP, and `AzureBastionSubnet` for browser-based VM access without Azure Portal authentication
 - **A roster CSV** at `out/students-{batchId}.csv` containing UPN, temp password, RG name, VM FQDN, VM admin user/password, and all account names.
 
 Student number is used across multiple resources for easy visual confirmation, for example:
@@ -202,7 +206,8 @@ After a successful run, each `lab-dev{N}-{batchId}` resource group should contai
 | Storage account | `stl{N}<unique>` | General-purpose |
 | Fabric capacity | `fabricl{N}<unique>` | **Single-user test mode only.** F2 SKU. Omitted under `-SharedFabric` |
 | VNet / Subnet / NSG / PIP / NIC | per VM | Networking for the lab VM |
-| VM | `lab-vm-l{N}-01` | Windows, computer name `cosmos-lab{N}`, admin `lab_user{N}` |
+| Azure Bastion | `l{N}-bastion` | Standard SKU with a tokenized shareable link for browser-based VM access |
+| VM | `lab-vm-l{N}-01` | Windows, `Standard_D4ds_v7`, computer name `cosmos-lab{N}`, admin `lab_user{N}` |
 
 The `<unique>` suffix is a deterministic hash of the RG resource ID — same RG name yields the same suffix on re-deploys.
 
@@ -210,7 +215,7 @@ The `<unique>` suffix is a deterministic hash of the RG resource ID — same RG 
 
 `out/students-{batchId}.csv` is the single artifact for credential distribution. Columns:
 
-`Student, UserPrincipalName, TempPassword, ObjectId, ResourceGroup, VmName, VmComputerName, VmPublicIp, VmPublicFqdn, VmAdminUsername, VmAdminPassword, CosmosServerlessAccount, CosmosProvisionedAccount, FoundryAccount, StorageAccount, EnvName, BatchId`
+`Student, UserPrincipalName, TempPassword, ObjectId, ResourceGroup, VmName, VmComputerName, VmPublicIp, VmPublicFqdn, BastionName, BastionUri, VmAdminUsername, VmAdminPassword, CosmosServerlessAccount, CosmosProvisionedAccount, DocumentDbCluster, FoundryAccount, StorageAccount, EnvName, BatchId`
 
 Batch mode appends: `FabricSharedCapacityId, FabricSharedCapacityName, FabricWorkspaceId, FabricWorkspaceName`. The last two are blank after `provision-student-environments.ps1` and are populated by `configure-student-fabric.ps1`.
 
@@ -220,11 +225,11 @@ Batch mode appends: `FabricSharedCapacityId, FabricSharedCapacityName, FabricWor
 
 ## Handing out credentials
 
-Each student needs **four** values to start:
+Each student needs these values to start:
 
-1. Their RDP target — `VmPublicFqdn` (or `VmPublicIp`)
+1. Their `BastionUri`, a tokenized shareable link that opens the VM connection page without an Azure Portal sign-in
 2. VM login — `VmAdminUsername` + `VmAdminPassword`
-3. Entra login (used inside the VM after RDP) — `UserPrincipalName` + `TempPassword`
+3. Entra login (used inside the VM for Azure services) — `UserPrincipalName` + `TempPassword`
 4. A pointer to [docs/StudentEnvironmentSetup.md](StudentEnvironmentSetup.md)
 
 The Entra temp password forces a change at first sign-in. Students should be aware they'll be prompted to pick a new password the first time they run `az login` or open the Azure Portal. In the browser they may also be required to set up additional authentication with an Authenticator app.
@@ -235,7 +240,7 @@ The Entra temp password forces a change at first sign-in. Students should be awa
 
 Before class, log in as one student end-to-end. Catches RBAC propagation lag, model deployment failures, and NSG issues that deployment success hides.
 
-1. RDP to the VM as `lab_user{N}` with the VM admin password.
+1. Open the student's `BastionUri` in a private browser window without signing in to Azure Portal. Use `lab_user{N}` and the VM admin password.
 2. Open PowerShell on the VM. Run:
    ```powershell
    az login
@@ -319,7 +324,8 @@ All figures below are rough planning estimates based on `westus` list prices. Co
 
 | Resource | Cost shape | Per-student rough estimate |
 |---|---|---|
-| VM (Standard_D4s_v3) | Per-hour when running; near zero when stopped & deallocated | About \$0.24/hr, or roughly \$170/mo if left running 24×7 |
+| VM (`Standard_D4ds_v7`) | Per-hour when running; near zero when stopped and deallocated | Confirm current regional pricing with the Azure pricing calculator |
+| Azure Bastion Standard | Fixed hourly charge while deployed, plus outbound data processing | Confirm current regional pricing with the Azure pricing calculator |
 | Cosmos serverless | Per-request RU | Cents per student at lab volumes |
 | Cosmos provisioned-autoscale (100–1000 RU × 2 containers) | Autoscale floor when idle, scales up under load | About \$9/mo per container at idle floor, up to \$88/mo per container at max. Realistic baseline of roughly \$18/mo per student total since most time is idle |
 | AI Foundry S0 | Per-token | Cents per student per workshop |
