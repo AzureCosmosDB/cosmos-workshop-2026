@@ -94,6 +94,27 @@ function New-RandomPassword {
   -join ($chars | Sort-Object { Get-Random })
 }
 
+function Assert-ValidVmAdminUsername {
+  param([Parameter(Mandatory = $true)][string]$Username)
+
+  $reservedUsernames = @(
+    'administrator', 'admin', 'user', 'user1', 'test', 'user2', 'test1', 'user3',
+    'admin1', '1', '123', 'a', 'actuser', 'adm', 'admin2', 'aspnet', 'backup',
+    'console', 'david', 'guest', 'john', 'owner', 'root', 'server', 'sql', 'support',
+    'support_388945a0', 'sys', 'test2', 'test3', 'user4', 'user5'
+  )
+
+  if ($Username.Length -gt 20) {
+    throw "VM admin username '$Username' exceeds the Windows VM limit of 20 characters."
+  }
+  if ($Username.EndsWith('.') -or $Username -match '[\x00-\x1f\\/"\[\]:|<>+=;,?*@&]') {
+    throw "VM admin username '$Username' contains characters that Azure Windows VMs do not allow."
+  }
+  if ($reservedUsernames -contains $Username.ToLowerInvariant()) {
+    throw "VM admin username '$Username' is reserved by Azure. Choose a different -VmAdminUsername value."
+  }
+}
+
 if (-not (Test-Path $BicepparamFile)) {
   throw "Bicep parameter file not found: $BicepparamFile"
 }
@@ -148,10 +169,11 @@ if ($EnvName.Length -gt 4) {
 }
 if (-not $VmAdminUsername) {
   $alias = ($UserPrincipalName -split '@', 2)[0] -replace '[^a-zA-Z0-9]', ''
-  if ($alias.Length -gt 20) { $alias = $alias.Substring(0, 20) }
-  if (-not $alias) { $alias = 'labuser' }
-  $VmAdminUsername = $alias
+  if ($alias.Length -gt 16) { $alias = $alias.Substring(0, 16) }
+  if (-not $alias) { $alias = 'user' }
+  $VmAdminUsername = "lab_$alias"
 }
+Assert-ValidVmAdminUsername -Username $VmAdminUsername
 
 $vmName = "lab-vm-$EnvName-01"
 $resourceGroupExists = [System.Convert]::ToBoolean((& az group exists --name $ResourceGroupName -o tsv).Trim())
@@ -167,7 +189,7 @@ $vmAdminPassword = New-RandomPassword
 $csvPath = Join-Path $OutputDirectory "student-$ResourceGroupName-$timestamp.csv"
 $vnetName = "$EnvName-vnet"
 $subnetName = "$EnvName-subnet"
-$existingSubnetId = [string](& az network vnet subnet show --resource-group $ResourceGroupName --vnet-name $vnetName --name $subnetName --query id -o tsv 2>$null)
+$existingSubnetId = [string](& az network vnet list --resource-group $ResourceGroupName --query "[?name=='$vnetName'].subnets[?name=='$subnetName'].id | [0][0]" -o tsv)
 $useExistingVnet = $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($existingSubnetId)
 
 $sharedFabricCapacityId = $null

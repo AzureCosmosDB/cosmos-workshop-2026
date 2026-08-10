@@ -121,18 +121,19 @@ az account set --subscription "<workshop-subscription-id-or-name>"
 | `-SharedFabric` | off | Sets `deployFabric=false` per deployment; records shared capacity ID in the roster |
 | `-SharedFabricResourceGroup` | `lab-shared-fabric` | Override only if `provision-shared-fabric.ps1` used a non-default RG name |
 | `-SharedFabricCapacityName` | `fabricworkshopshared` | Override only if `provision-shared-fabric.ps1` used a non-default capacity name |
+| `-MaxParallelDeployments` | `5` | Number of student ARM deployments started concurrently; reduce if the subscription reaches regional quota or API throttling limits |
 
 ### What the script does, in order
 
 1. Validates bicepparam path and output directory.
 2. If `-SharedFabric`: looks up the shared capacity resource ID; throws if not found.
 3. Resolves the tenant default domain.
-4. For each student N:
+4. Processes students in concurrent batches controlled by `-MaxParallelDeployments`. For each student N:
    1. Generates Windows-complexity-compliant passwords (student temp + VM admin).
    2. Creates the Entra user with `--force-change-password-next-sign-in true`.
    3. Reads back the user's object ID.
    4. `az deployment sub what-if` against [main.bicep](../bicep/main.bicep) (validates parameters).
-   5. `az deployment sub create` — creates the RG, all resources, and grants the student Owner. Retries up to **3 times with a 45-second backoff** between attempts. ARM deployments are idempotent, so a retry resumes from the current state rather than starting over. This handles the most common transient failure mode: an AI Foundry / Cognitive Services `RequestConflict` race where a child resource (project or model deployment) tries to attach to the account before its provisioning state has settled.
+  5. Starts `az deployment sub create --no-wait` so other students in the batch can begin deploying. The script then waits for each deployment and retries failures up to **3 times with a 45-second backoff** between attempts. ARM deployments are idempotent, so a retry resumes from the current state rather than starting over. This handles the most common transient failure mode: an AI Foundry / Cognitive Services `RequestConflict` race where a child resource (project or model deployment) tries to attach to the account before its provisioning state has settled.
    6. Pulls deployment outputs and appends a roster row to `out/students-{batchId}.csv` (the row is flushed immediately, so a mid-batch failure still leaves a complete record of every student provisioned up to that point).
    7. Calls [Set-CosmosMirroringRbac.ps1](../script/Set-CosmosMirroringRbac.ps1) (a transliteration of the Microsoft-published [rbac-cosmos-mirror.sh](https://github.com/Azure-Samples/azure-cli-samples/blob/master/cosmosdb/common/rbac-cosmos-mirror.sh) bash sample) to grant the student a custom Cosmos role (`readMetadata` + `readAnalytics`) on the serverless account. Required for Lab 4B to configure Fabric mirroring via Entra ID auth. Uses `az` CLI — no extra auth context needed. Failures here are non-fatal — the script warns, records the student, and continues; a summary is printed at the end so you can re-run the helper manually.
 

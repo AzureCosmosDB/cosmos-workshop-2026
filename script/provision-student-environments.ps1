@@ -38,7 +38,11 @@ param(
   [string]$SharedFabricResourceGroup = 'lab-shared-fabric',
 
   [Parameter(Mandatory = $false)]
-  [string]$SharedFabricCapacityName = 'fabricworkshopshared'
+  [string]$SharedFabricCapacityName = 'fabricworkshopshared',
+
+  [Parameter(Mandatory = $false)]
+  [ValidateRange(1, 20)]
+  [int]$MaxParallelDeployments = 5
 )
 
 $ErrorActionPreference = 'Stop'
@@ -155,6 +159,7 @@ Write-Output "  Batch ID:      $batchId"
 Write-Output "  Tenant domain: $tenantDomain"
 Write-Output "  Location:      $Location"
 Write-Output "  Database mode: $(if ($IsDocDB) { 'DocumentDB' } else { 'Cosmos DB for NoSQL' })"
+Write-Output "  Parallelism:   $MaxParallelDeployments deployment(s)"
 if ($NoFabric) {
   Write-Output "  Fabric mode:   none (skipped)"
 } elseif ($SharedFabric) {
@@ -164,7 +169,11 @@ if ($NoFabric) {
 }
 Write-Output ""
 
-for ($index = 1; $index -le $StudentCount; $index++) {
+for ($batchStart = 1; $batchStart -le $StudentCount; $batchStart += $MaxParallelDeployments) {
+  $batchEnd = [Math]::Min($batchStart + $MaxParallelDeployments - 1, $StudentCount)
+  $pendingDeployments = New-Object System.Collections.Generic.List[object]
+
+  for ($index = $batchStart; $index -le $batchEnd; $index++) {
   $studentNumber = $index
   $studentLabel = "Lab User $studentNumber"
   $studentDisplayName = "$batchShort Lab User $studentNumber"
@@ -255,22 +264,62 @@ $fabricMembersFile = Join-Path $OutputDirectory "fabric-admins-$batchId-$index.j
     throw "What-if failed for deployment '$deploymentName'."
   }
 
-  # Retry transient ARM failures (e.g., Cognitive Services 'provisioning state is not
-  # terminal' races between the AI Foundry account and its child project / model
-  # deployments). ARM deployments are idempotent, so re-running with the same params
-  # against the same RG just resumes from current state.
-  $deploymentAttempts = 3
-  $deploymentDelaySeconds = 45
-  for ($attempt = 1; $attempt -le $deploymentAttempts; $attempt++) {
-    Write-Output "[$studentLabel] deploying $deploymentName (attempt $attempt/$deploymentAttempts)"
-    az deployment sub create @deployParams --only-show-errors | Out-Null
-    if ($LASTEXITCODE -eq 0) { break }
-    if ($attempt -lt $deploymentAttempts) {
-      Write-Warning "[$studentLabel] deployment attempt $attempt failed; waiting $deploymentDelaySeconds s before retry (often a transient AI Foundry / Cognitive Services race)"
-      Start-Sleep -Seconds $deploymentDelaySeconds
-    }
+    Write-Output "[$studentLabel] starting deployment $deploymentName"
+    az deployment sub create @deployParams --no-wait --only-show-errors | Out-Null
+    Assert-LastAzCommand -FailureMessage "Failed to start deployment '$deploymentName'."
+
+    $pendingDeployments.Add([pscustomobject]@{
+      StudentLabel = $studentLabel
+      StudentUpn = $studentUpn
+      StudentPassword = $studentPassword
+      StudentObjectId = $studentObjectId
+      ResourceGroupName = $resourceGroupName
+      DeploymentName = $deploymentName
+      DeployParams = $deployParams
+      EnvName = $envName
+      VmAdminUser = $vmAdminUser
+      VmAdminPassword = $vmAdminPassword
+      VmComputerName = $vmComputerName
+    }) | Out-Null
   }
-  Assert-LastAzCommand -FailureMessage "Deployment '$deploymentName' failed after $deploymentAttempts attempts."
+
+  Write-Output "Waiting for deployment batch $batchStart-$batchEnd."
+  foreach ($pendingDeployment in $pendingDeployments) {
+    $studentLabel = $pendingDeployment.StudentLabel
+    $studentUpn = $pendingDeployment.StudentUpn
+    $studentPassword = $pendingDeployment.StudentPassword
+    $studentObjectId = $pendingDeployment.StudentObjectId
+    $resourceGroupName = $pendingDeployment.ResourceGroupName
+    $deploymentName = $pendingDeployment.DeploymentName
+    $envName = $pendingDeployment.EnvName
+    $vmAdminUser = $pendingDeployment.VmAdminUser
+    $vmAdminPassword = $pendingDeployment.VmAdminPassword
+    $vmComputerName = $pendingDeployment.VmComputerName
+
+    Write-Output "[$studentLabel] waiting for deployment $deploymentName"
+    az deployment sub wait `
+      --name $deploymentName `
+      --custom "properties.provisioningState=='Succeeded' || properties.provisioningState=='Failed' || properties.provisioningState=='Canceled'" `
+      --timeout 7200 `
+      --only-show-errors
+    $waitExitCode = $LASTEXITCODE
+    $deploymentState = (& az deployment sub show --name $deploymentName --query properties.provisioningState -o tsv 2>$null).Trim()
+
+    # The asynchronous launch is attempt 1. Retry transient ARM failures synchronously
+    # against the same deployment and resource group so ARM resumes from current state.
+    if ($waitExitCode -ne 0 -or $LASTEXITCODE -ne 0 -or $deploymentState -ne 'Succeeded') {
+      $deploymentAttempts = 3
+      $deploymentDelaySeconds = 45
+      $retryParams = $pendingDeployment.DeployParams
+      for ($attempt = 2; $attempt -le $deploymentAttempts; $attempt++) {
+        Write-Warning "[$studentLabel] deployment attempt $($attempt - 1) failed; waiting $deploymentDelaySeconds s before retry"
+        Start-Sleep -Seconds $deploymentDelaySeconds
+        Write-Output "[$studentLabel] retrying deployment $deploymentName (attempt $attempt/$deploymentAttempts)"
+        az deployment sub create @retryParams --only-show-errors | Out-Null
+        if ($LASTEXITCODE -eq 0) { break }
+      }
+      Assert-LastAzCommand -FailureMessage "Deployment '$deploymentName' failed after $deploymentAttempts attempts."
+    }
 
   $outputsJson = az deployment sub show --name $deploymentName --query properties.outputs -o json
   Assert-LastAzCommand -FailureMessage "Failed to read outputs for deployment '$deploymentName'."
@@ -335,6 +384,7 @@ $fabricMembersFile = Join-Path $OutputDirectory "fabric-admins-$batchId-$index.j
     $rowObject | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
   } else {
     $rowObject | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8 -Append
+  }
   }
 }
 
