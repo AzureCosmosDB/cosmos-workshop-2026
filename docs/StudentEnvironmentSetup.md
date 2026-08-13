@@ -40,7 +40,7 @@ The shareable link contains no credentials. The VM login is a local Windows acco
 
 ### 2. Sign in to Azure
 
-Open the Terminal app with PowerShell on the VM and run:
+Open PowerShell 7 on the VM and run:
 
 ```powershell
 az login
@@ -50,9 +50,10 @@ Sign in with your **Entra credentials** (`lab_user{N}_<batch>@<tenant>` + tempor
 
 ### 3. Populate workshop environment variables
 
-From the workshop repo root:
+The deployment clones the workshop repository automatically. Git Bash is not required. In PowerShell 7, run:
 
 ```powershell
+cd "$HOME\Documents\cosmos-workshop-2026"
 ./SetEnv.ps1
 ```
 

@@ -242,14 +242,14 @@ The Entra temp password forces a change at first sign-in. Students should be awa
 Before class, log in as one student end-to-end. Catches RBAC propagation lag, model deployment failures, and NSG issues that deployment success hides.
 
 1. Open the student's `BastionUri` in a private browser window without signing in to Azure Portal. Use `lab_user{N}` and the VM admin password.
-2. Open PowerShell on the VM. Run:
+2. Open PowerShell 7 on the VM. Run:
    ```powershell
    az login
    ```
    Sign in as `lab_user{N}_{batchId}@<tenant>`. Change the password when prompted.
-3. Clone or copy the workshop repo onto the VM, then:
+3. Change to the workshop repository cloned during VM initialization, then:
    ```powershell
-   cd <repo-root>
+  cd "$HOME\Documents\cosmos-workshop-2026"
    ./SetEnv.ps1
    ```
    Should auto-discover the student's RG and print non-empty values for all seven env vars. Restart the terminal.

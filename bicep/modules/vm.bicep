@@ -100,5 +100,23 @@ resource virtualMachine 'Microsoft.Compute/virtualMachines@2024-11-01' = {
   properties: union(vmPropertiesBase, vmSecurityProfile)
 }
 
+resource initializeLabVm 'Microsoft.Compute/virtualMachines/runCommands@2024-11-01' = {
+  parent: virtualMachine
+  name: 'InitializeLabVm'
+  location: location
+  properties: {
+    source: {
+      script: loadTextContent('../../script/Initialize-LabVm.ps1')
+    }
+    parameters: []
+    protectedParameters: []
+    runAsUser: adminUsername
+    runAsPassword: adminPassword
+    timeoutInSeconds: 7200
+    asyncExecution: false
+    treatFailureAsDeploymentFailure: true
+  }
+}
+
 output vmId string = virtualMachine.id
 output vmNameOut string = virtualMachine.name
