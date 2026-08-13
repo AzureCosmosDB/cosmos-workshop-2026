@@ -171,9 +171,12 @@ if (-not $VmAdminUsername) {
   $alias = ($UserPrincipalName -split '@', 2)[0] -replace '[^a-zA-Z0-9]', ''
   if ($alias.Length -gt 16) { $alias = $alias.Substring(0, 16) }
   if (-not $alias) { $alias = 'user' }
-  $VmAdminUsername = "lab_$alias"
+  $VmAdminUsername = if ($IsDocDB) { "lab$alias" } else { "lab_$alias" }
 }
 Assert-ValidVmAdminUsername -Username $VmAdminUsername
+if ($IsDocDB -and $VmAdminUsername -notmatch '^[a-zA-Z0-9]+$') {
+  throw "DocumentDB administrator username '$VmAdminUsername' must contain only Latin letters and numbers."
+}
 
 $vmName = "lab-vm-$EnvName-01"
 $resourceGroupExists = [System.Convert]::ToBoolean((& az group exists --name $ResourceGroupName -o tsv).Trim())

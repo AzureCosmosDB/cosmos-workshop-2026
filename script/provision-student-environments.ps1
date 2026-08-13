@@ -178,7 +178,7 @@ for ($batchStart = 1; $batchStart -le $StudentCount; $batchStart += $MaxParallel
   $studentLabel = "Lab User $studentNumber"
   $studentDisplayName = "$batchShort Lab User $studentNumber"
   $envName = "l$studentNumber"
-  $vmAdminUser = "lab_user$studentNumber"
+  $vmAdminUser = if ($IsDocDB) { "labuser$studentNumber" } else { "lab_user$studentNumber" }
   $vmComputerName = "cosmos-lab$studentNumber"
   $resourceGroupName = "lab-dev$studentNumber-$batchId"
   $deploymentName = "lab-dev$studentNumber-$batchId"
