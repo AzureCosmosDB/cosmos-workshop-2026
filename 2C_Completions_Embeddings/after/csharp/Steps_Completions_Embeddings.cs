@@ -38,10 +38,7 @@ public class Steps_Completions_Embeddings
             ?? throw new InvalidOperationException("FOUNDRY_ENDPOINT environment variable is required.");
         var embeddingsEndpoint = Environment.GetEnvironmentVariable("EMBEDDINGS_ENDPOINT")
             ?? throw new InvalidOperationException("EMBEDDINGS_ENDPOINT environment variable is required.");
-        var embeddingsKey = Environment.GetEnvironmentVariable("EMBEDDINGS_KEY")
-            ?? throw new InvalidOperationException("EMBEDDINGS_KEY environment variable is required.");
-
-        var credential = new DefaultAzureCredential();
+        var credential = new AzureCliCredential();
 
         CosmosClient = new CosmosClient(cosmosEndpoint, credential, new CosmosClientOptions
         {
@@ -56,9 +53,7 @@ public class Steps_Completions_Embeddings
         FoundryEndpoint = foundryEndpoint;
 
         // Embeddings: separate Azure OpenAI resource, API key auth (v1 embeddings does not yet support Entra).
-        EmbeddingsOpenAIClient = new AzureOpenAIClient(
-            new Uri(embeddingsEndpoint),
-            new System.ClientModel.ApiKeyCredential(embeddingsKey));
+        EmbeddingsOpenAIClient = new AzureOpenAIClient(new Uri(embeddingsEndpoint), credential);
         EmbeddingsEndpoint = embeddingsEndpoint;
 
         CompletionsModel = Environment.GetEnvironmentVariable("COMPLETIONS_MODEL") ?? "gpt41";
@@ -88,12 +83,7 @@ public class Steps_Completions_Embeddings
             new UserChatMessage(message)
         };
 
-        var completionsOptions = new ChatCompletionOptions
-        {
-            Temperature = 0.7f,
-            MaxOutputTokenCount = 200,
-            TopP = 0.95f
-        };
+        var completionsOptions = new ChatCompletionOptions();
 
         try
         {

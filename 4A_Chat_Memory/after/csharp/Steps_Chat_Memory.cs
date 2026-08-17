@@ -40,7 +40,7 @@ public class Steps_Chat_Memory
         var cosmosEndpoint = Environment.GetEnvironmentVariable("COSMOS_ENDPOINT")
             ?? throw new InvalidOperationException("COSMOS_ENDPOINT environment variable is required.");
 
-        var credential = new DefaultAzureCredential();
+        var credential = new AzureCliCredential();
 
         CosmosClient = new CosmosClient(cosmosEndpoint, credential, new CosmosClientOptions
         {
@@ -63,22 +63,18 @@ public class Steps_Chat_Memory
 
         // Azure OpenAI connection
         // Chat completions: Foundry endpoint, Entra ID auth.
-        // Embeddings: separate Azure OpenAI resource, API key auth.
+        // Embeddings: Cognitive Services endpoint, Entra ID auth.
         var foundryEndpoint = Environment.GetEnvironmentVariable("FOUNDRY_ENDPOINT")
             ?? throw new InvalidOperationException("FOUNDRY_ENDPOINT environment variable is required.");
         var embeddingsEndpoint = Environment.GetEnvironmentVariable("EMBEDDINGS_ENDPOINT")
             ?? throw new InvalidOperationException("EMBEDDINGS_ENDPOINT environment variable is required.");
-        var embeddingsKey = Environment.GetEnvironmentVariable("EMBEDDINGS_KEY")
-            ?? throw new InvalidOperationException("EMBEDDINGS_KEY environment variable is required.");
         ChatModel = Environment.GetEnvironmentVariable("COMPLETIONS_MODEL")
             ?? throw new InvalidOperationException("COMPLETIONS_MODEL environment variable is required.");
         EmbeddingsModel = Environment.GetEnvironmentVariable("EMBEDDINGS_MODEL")
             ?? throw new InvalidOperationException("EMBEDDINGS_MODEL environment variable is required.");
 
         FoundryClient = new AzureOpenAIClient(new Uri(foundryEndpoint), credential);
-        EmbeddingsClient = new AzureOpenAIClient(
-            new Uri(embeddingsEndpoint),
-            new System.ClientModel.ApiKeyCredential(embeddingsKey));
+        EmbeddingsClient = new AzureOpenAIClient(new Uri(embeddingsEndpoint), credential);
         ChatClient = FoundryClient.GetChatClient(ChatModel);
         EmbeddingClient = EmbeddingsClient.GetEmbeddingClient(EmbeddingsModel);
 
@@ -272,11 +268,7 @@ public class Steps_Chat_Memory
         };
 
         var sw = Stopwatch.StartNew();
-        var completion = await ChatClient.CompleteChatAsync(messages, new ChatCompletionOptions
-        {
-            Temperature = 0.7f,
-            MaxOutputTokenCount = 500
-        });
+        var completion = await ChatClient.CompleteChatAsync(messages, new ChatCompletionOptions());
         sw.Stop();
         var latencyMs = (int)sw.ElapsedMilliseconds;
 

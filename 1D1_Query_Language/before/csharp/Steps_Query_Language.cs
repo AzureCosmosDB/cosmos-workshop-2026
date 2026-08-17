@@ -23,7 +23,7 @@ public class Steps_Query_Language
 
     private CosmosClient CreateClient(string endpoint)
     {
-        var credential = new DefaultAzureCredential();
+        var credential = new AzureCliCredential();
         return new CosmosClient(endpoint, credential, new CosmosClientOptions
         {
             SerializerOptions = new CosmosSerializationOptions { PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase }

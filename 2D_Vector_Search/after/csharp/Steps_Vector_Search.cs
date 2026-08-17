@@ -23,7 +23,7 @@ public class Steps_Vector_Search
 
     private CosmosClient CreateClient(string endpoint)
     {
-        var credential = new DefaultAzureCredential();
+        var credential = new AzureCliCredential();
 
         return new CosmosClient(endpoint, credential, new CosmosClientOptions
         {
@@ -41,9 +41,6 @@ public class Steps_Vector_Search
             ?? throw new InvalidOperationException("COSMOS_ENDPOINT environment variable is required.");
         var embeddingsEndpoint = Environment.GetEnvironmentVariable("EMBEDDINGS_ENDPOINT")
             ?? throw new InvalidOperationException("EMBEDDINGS_ENDPOINT environment variable is required.");
-        var embeddingsKey = Environment.GetEnvironmentVariable("EMBEDDINGS_KEY")
-            ?? throw new InvalidOperationException("EMBEDDINGS_KEY environment variable is required.");
-
         EmbeddingsModel = Environment.GetEnvironmentVariable("EMBEDDINGS_MODEL") ?? "textembedding3small";
 
         Client = CreateClient(endpoint);
@@ -52,9 +49,7 @@ public class Steps_Vector_Search
         Endpoint = endpoint;
 
         // Embeddings: Azure OpenAI resource, API key auth.
-        EmbeddingsOpenAIClient = new AzureOpenAIClient(
-            new Uri(embeddingsEndpoint),
-            new System.ClientModel.ApiKeyCredential(embeddingsKey));
+        EmbeddingsOpenAIClient = new AzureOpenAIClient(new Uri(embeddingsEndpoint), new AzureCliCredential());
         EmbeddingsEndpoint = embeddingsEndpoint;
 
         Console.WriteLine($"Connected to Cosmos DB:   {endpoint}/{DbName}/{ContainerName}");

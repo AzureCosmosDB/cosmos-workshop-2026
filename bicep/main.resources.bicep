@@ -109,7 +109,6 @@ module networking './modules/networking.bicep' = {
   params: {
     location: location
     envName: envName
-    uniqueSuffix: uniqueSuffix
     useExistingVnet: useExistingVnet
   }
 }
@@ -177,9 +176,10 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2022-05-01' = {
     accessTier: 'Hot'
     supportsHttpsTrafficOnly: true
     allowSharedKeyAccess: false
+    publicNetworkAccess: 'Disabled'
     networkAcls: {
-      bypass: 'AzureServices'
-      defaultAction: 'Allow'
+      bypass: 'None'
+      defaultAction: 'Deny'
     }
   }
 }
@@ -215,6 +215,24 @@ module foundry './modules/foundry.bicep' = if (deployFoundry) {
     embeddingModelVersion: foundryEmbeddingModelVersion
     embeddingSkuName: foundryEmbeddingSkuName
     studentOwnerObjectId: studentOwnerObjectId
+  }
+}
+
+// ========== PRIVATE ENDPOINTS ======
+
+module privateEndpoints './modules/private-endpoints.bicep' = {
+  name: 'private-endpoints'
+  params: {
+    location: location
+    envName: envName
+    vnetId: networking.outputs.vnetId
+    subnetId: networking.outputs.privateEndpointSubnetId
+    deployCosmos: !isDocDB
+    cosmosServerlessId: isDocDB ? '' : cosmosServerless!.outputs.accountId
+    cosmosProvisionedId: isDocDB ? '' : cosmosProvisioned!.outputs.accountId
+    storageAccountId: storageAccount.id
+    deployFoundry: deployFoundry
+    foundryAccountId: deployFoundry ? foundry!.outputs.accountId : ''
   }
 }
 
@@ -260,8 +278,8 @@ output aiFoundryEndpoint string = deployFoundry ? foundry!.outputs.endpoint : ''
 output aiFoundryProjectName string = deployFoundry ? foundry!.outputs.projectName : ''
 output chatDeploymentName string = deployFoundry ? foundry!.outputs.deploymentName : ''
 output embeddingDeploymentName string = deployFoundry ? foundry!.outputs.embeddingDeploymentName : ''
-output vmPublicIp string = networking.outputs.publicIpFqdn
-output vmPublicIpAddress string = networking.outputs.publicIpAddress
+output vmPublicIp string = ''
+output vmPublicIpAddress string = ''
 output bastionName string = networking.outputs.bastionName
 output bastionId string = networking.outputs.bastionId
 output vmId string = vm.outputs.vmId

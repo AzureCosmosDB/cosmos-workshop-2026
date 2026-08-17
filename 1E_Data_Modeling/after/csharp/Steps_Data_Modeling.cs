@@ -39,7 +39,7 @@ public class Steps_Data_Modeling
 
     private static CosmosClient CreateClient(string endpoint)
     {
-        var credential = new DefaultAzureCredential();
+        var credential = new AzureCliCredential();
         return new CosmosClient(endpoint, credential, new CosmosClientOptions
         {
             SerializerOptions = new CosmosSerializationOptions { PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase }

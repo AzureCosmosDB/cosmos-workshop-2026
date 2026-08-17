@@ -56,7 +56,7 @@ public class Steps_RAG_Pipeline
 
     private CosmosClient CreateCosmosClient(string endpoint)
     {
-        var credential = new DefaultAzureCredential();
+        var credential = new AzureCliCredential();
 
         return new CosmosClient(endpoint, credential, new CosmosClientOptions
         {
@@ -77,9 +77,6 @@ public class Steps_RAG_Pipeline
             ?? throw new InvalidOperationException("FOUNDRY_ENDPOINT environment variable is required.");
         var embeddingsEndpoint = Environment.GetEnvironmentVariable("EMBEDDINGS_ENDPOINT")
             ?? throw new InvalidOperationException("EMBEDDINGS_ENDPOINT environment variable is required.");
-        var embeddingsKey = Environment.GetEnvironmentVariable("EMBEDDINGS_KEY")
-            ?? throw new InvalidOperationException("EMBEDDINGS_KEY environment variable is required.");
-
         CosmosClient = CreateCosmosClient(cosmosEndpoint);
         DB = CosmosClient.GetDatabase(DbName);
         Container = DB.GetContainer(ContainerName);
@@ -89,14 +86,12 @@ public class Steps_RAG_Pipeline
         EmbeddingsModel = Environment.GetEnvironmentVariable("EMBEDDINGS_MODEL") ?? "textembedding3small";
 
         // Chat completions: Foundry endpoint, Entra ID auth.
-        OpenAIClient = new AzureOpenAIClient(new Uri(foundryEndpoint), new DefaultAzureCredential());
+        OpenAIClient = new AzureOpenAIClient(new Uri(foundryEndpoint), new AzureCliCredential());
         FoundryEndpoint = foundryEndpoint;
         _chatClient = OpenAIClient.GetChatClient(CompletionsModel);
 
         // Embeddings: separate Azure OpenAI resource, API key auth.
-        EmbeddingsOpenAIClient = new AzureOpenAIClient(
-            new Uri(embeddingsEndpoint),
-            new System.ClientModel.ApiKeyCredential(embeddingsKey));
+        EmbeddingsOpenAIClient = new AzureOpenAIClient(new Uri(embeddingsEndpoint), new AzureCliCredential());
         EmbeddingsEndpoint = embeddingsEndpoint;
         _embeddingClient = EmbeddingsOpenAIClient.GetEmbeddingClient(EmbeddingsModel);
 
@@ -286,11 +281,7 @@ public class Steps_RAG_Pipeline
             new UserChatMessage(question)
         };
 
-        var options = new ChatCompletionOptions
-        {
-            Temperature = 0.7f,
-            MaxOutputTokenCount = 500
-        };
+        var options = new ChatCompletionOptions();
 
         try
         {

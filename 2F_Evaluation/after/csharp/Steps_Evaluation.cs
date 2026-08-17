@@ -52,7 +52,7 @@ public class Steps_Evaluation
         var foundryEndpoint = Environment.GetEnvironmentVariable("FOUNDRY_ENDPOINT")
             ?? throw new InvalidOperationException("FOUNDRY_ENDPOINT environment variable is required.");
 
-        var credential = new DefaultAzureCredential();
+        var credential = new AzureCliCredential();
 
         CosmosClient = new CosmosClient(cosmosEndpoint, credential, new CosmosClientOptions
         {
@@ -110,11 +110,7 @@ public class Steps_Evaluation
             new UserChatMessage(question)
         };
 
-        var options = new ChatCompletionOptions
-        {
-            Temperature = 0.7f,
-            MaxOutputTokenCount = 500
-        };
+        var options = new ChatCompletionOptions();
 
         try
         {
@@ -169,11 +165,7 @@ public class Steps_Evaluation
                 new UserChatMessage(scoringPrompt)
             };
 
-            var scoringOptions = new ChatCompletionOptions
-            {
-                Temperature = 0.0f,
-                MaxOutputTokenCount = 10
-            };
+            var scoringOptions = new ChatCompletionOptions();
 
             var evalChatClient = OpenAIClient?.GetChatClient(EvalModel ?? CompletionsModel ?? "gpt41");
 

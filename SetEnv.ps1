@@ -1,6 +1,6 @@
 # Workshop Environment Setup
 # Run on the lab VM after `az login`. Discovers the student's lab resource group
-# and all required endpoints/keys, then writes them to User-scope env vars used
+# and all required endpoints, then writes them to User-scope env vars used
 # by every lab in this repo. Restart VS Code or the terminal after running.
 #
 #   ./SetEnv.ps1                       # auto-discover the RG (works for student logins)
@@ -82,11 +82,8 @@ $foundryName = $foundry.name
 
 # Foundry chat completions use the *.services.ai.azure.com host (Entra ID auth).
 $FOUNDRY_ENDPOINT = "https://$foundryName.services.ai.azure.com/"
-# v1 embeddings still need the *.cognitiveservices.azure.com host with key auth.
+# Embeddings use the *.cognitiveservices.azure.com host with Entra ID auth.
 $EMBEDDINGS_ENDPOINT = $foundry.properties.endpoint
-
-$EMBEDDINGS_KEY = (az cognitiveservices account keys list -g $ResourceGroup -n $foundryName --query key1 -o tsv).Trim()
-if ($LASTEXITCODE -ne 0 -or -not $EMBEDDINGS_KEY) { Write-Error "Failed to read keys for $foundryName."; exit 1 }
 
 # ---- Model deployment names (the names used in API calls, not raw model names) ----
 $deploymentsJson = az cognitiveservices account deployment list -g $ResourceGroup -n $foundryName -o json
@@ -106,7 +103,7 @@ $EMBEDDINGS_MODEL  = $embedding.name
 [System.Environment]::SetEnvironmentVariable('COSMOS_ENDPOINT_PROVISIONED',$COSMOS_ENDPOINT_PROVISIONED, 'User')
 [System.Environment]::SetEnvironmentVariable('FOUNDRY_ENDPOINT',           $FOUNDRY_ENDPOINT,            'User')
 [System.Environment]::SetEnvironmentVariable('EMBEDDINGS_ENDPOINT',        $EMBEDDINGS_ENDPOINT,         'User')
-[System.Environment]::SetEnvironmentVariable('EMBEDDINGS_KEY',             $EMBEDDINGS_KEY,              'User')
+[System.Environment]::SetEnvironmentVariable('EMBEDDINGS_KEY',             $null,                        'User')
 [System.Environment]::SetEnvironmentVariable('COMPLETIONS_MODEL',          $COMPLETIONS_MODEL,           'User')
 [System.Environment]::SetEnvironmentVariable('EMBEDDINGS_MODEL',           $EMBEDDINGS_MODEL,            'User')
 
@@ -117,7 +114,6 @@ Write-Output "  COSMOS_ENDPOINT             = $COSMOS_ENDPOINT"
 Write-Output "  COSMOS_ENDPOINT_PROVISIONED = $COSMOS_ENDPOINT_PROVISIONED"
 Write-Output "  FOUNDRY_ENDPOINT            = $FOUNDRY_ENDPOINT"
 Write-Output "  EMBEDDINGS_ENDPOINT         = $EMBEDDINGS_ENDPOINT"
-Write-Output "  EMBEDDINGS_KEY              = ***"
 Write-Output "  COMPLETIONS_MODEL           = $COMPLETIONS_MODEL"
 Write-Output "  EMBEDDINGS_MODEL            = $EMBEDDINGS_MODEL"
 Write-Output "Restart VS Code / your terminal to pick up the new environment variables."

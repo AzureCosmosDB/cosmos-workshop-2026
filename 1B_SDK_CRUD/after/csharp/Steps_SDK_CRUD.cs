@@ -25,7 +25,7 @@ public class Steps_SDK_CRUD
 
         _endpoint = cosmosEndpoint;
 
-        var credential = new DefaultAzureCredential();
+        var credential = new AzureCliCredential();
         var dbName = "WorkshopData";
         var containerName = "Catalog";
 
@@ -179,7 +179,7 @@ public class Steps_SDK_CRUD
 
             Console.WriteLine("=== Lab Complete ===");
             Console.WriteLine("You have completed the CRUD operations exercise in C#. You:");
-            Console.WriteLine("- Connected to Cosmos DB using DefaultAzureCredential");
+            Console.WriteLine("- Connected to Cosmos DB using AzureCliCredential");
             Console.WriteLine("- Created an item with CreateItemAsync()");
             Console.WriteLine("- Read an item with ReadItemAsync()");
             Console.WriteLine("- Updated an item with UpsertItemAsync()");

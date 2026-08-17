@@ -60,7 +60,7 @@ resource aiFoundryAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   properties: {
     allowProjectManagement: true
     customSubDomainName: accountName
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: 'Disabled'
     disableLocalAuth: true
   }
 }
@@ -136,6 +136,7 @@ resource studentOpenAiContributorAssignment 'Microsoft.Authorization/roleAssignm
 }
 
 output endpoint string = aiFoundryAccount.properties.endpoint
+output accountId string = aiFoundryAccount.id
 output projectName string = aiFoundryProject.name
 output deploymentName string = chatModelDeployment.name
 output embeddingDeploymentName string = embeddingModelDeployment.name

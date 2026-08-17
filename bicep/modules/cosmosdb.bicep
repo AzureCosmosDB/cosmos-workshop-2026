@@ -23,7 +23,7 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
   tags: tags
   properties: {
     databaseAccountOfferType: 'Standard'
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: 'Disabled'
     disableLocalAuth: true
     backupPolicy: {
       type: 'Continuous'
@@ -326,3 +326,4 @@ resource modelingEmbedContainers 'Microsoft.DocumentDB/databaseAccounts/sqlDatab
 }]
 
 output endpoint string = cosmosAccount.properties.documentEndpoint
+output accountId string = cosmosAccount.id

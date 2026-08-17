@@ -4,7 +4,17 @@ param(
   [string]$RepositoryUrl = 'https://github.com/AzureCosmosDB/cosmos-workshop-2026.git',
 
   [Parameter(Mandatory = $false)]
-  [string]$RepositoryPath = (Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'cosmos-workshop-2026')
+  [string]$RepositoryPath = '',
+
+  [Parameter(Mandatory = $false)]
+  [string]$UserHomePath = '',
+
+  [Parameter(Mandatory = $false)]
+  [string]$SetupTaskName,
+
+  [Parameter(Mandatory = $false)]
+  [ValidateSet('All', 'Machine', 'User')]
+  [string]$SetupPhase = 'All'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -15,34 +25,50 @@ function Update-PathFromRegistry {
   $env:Path = (@($machine, $user) | Where-Object { $_ }) -join ';'
 }
 
-function Invoke-Winget {
-  param([Parameter(Mandatory)][string]$Id)
+function Invoke-Chocolatey {
+  param([Parameter(Mandatory)][string]$Package)
 
-  Write-Host "==> winget install $Id" -ForegroundColor Cyan
-  winget install --id $Id --exact --silent `
-    --accept-package-agreements --accept-source-agreements
-  if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne -1978335189) {
-    # -1978335189 = APPINSTALLER_CLI_ERROR_UPDATE_NOT_APPLICABLE (already installed/up to date)
-    throw "winget install '$Id' failed with exit code $LASTEXITCODE."
+  Write-Host "==> choco install $Package" -ForegroundColor Cyan
+  & choco.exe install $Package --yes --no-progress --limit-output
+  if ($LASTEXITCODE -ne 0) {
+    throw "choco install '$Package' failed with exit code $LASTEXITCODE."
   }
   Update-PathFromRegistry
 }
 
-if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-  throw "winget is not available on PATH. Install App Installer from the Microsoft Store and retry."
+if ($SetupPhase -in @('All', 'Machine')) {
+  if (-not (Get-Command choco.exe -ErrorAction SilentlyContinue)) {
+    Write-Host '==> Installing Chocolatey' -ForegroundColor Cyan
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072
+    $installScript = (New-Object Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')
+    & ([scriptblock]::Create($installScript))
+    Update-PathFromRegistry
+  }
+
+  Invoke-Chocolatey -Package 'powershell-core'
+  Invoke-Chocolatey -Package 'azure-cli'
+  Invoke-Chocolatey -Package 'git'
+  Invoke-Chocolatey -Package 'dotnet-10.0-sdk'
+  Invoke-Chocolatey -Package 'python314'
+  Invoke-Chocolatey -Package 'vscode'
 }
 
-Invoke-Winget -Id 'Microsoft.PowerShell'
+if ($SetupPhase -eq 'Machine') {
+  Write-Host "Lab VM machine setup complete." -ForegroundColor Green
+  exit 0
+}
 
-Invoke-Winget -Id 'Microsoft.AzureCLI'
+Update-PathFromRegistry
 
-Invoke-Winget -Id 'Git.Git'
+if (-not $RepositoryPath) {
+  $documentsPath = [Environment]::GetFolderPath('MyDocuments')
+  if (-not $documentsPath) { throw 'Unable to resolve the current user Documents folder.' }
+  $RepositoryPath = Join-Path $documentsPath 'cosmos-workshop-2026'
+}
 
-Invoke-Winget -Id 'Microsoft.DotNet.SDK.10'
-
-Invoke-Winget -Id 'Python.Python.3.14'
-
-Invoke-Winget -Id 'Microsoft.VisualStudioCode'
+if (-not $UserHomePath) {
+  $UserHomePath = Split-Path (Split-Path $RepositoryPath -Parent) -Parent
+}
 
 $git = Get-Command git.exe -ErrorAction SilentlyContinue
 if (-not $git) { throw "git.exe not found on PATH after install." }
@@ -80,9 +106,10 @@ if (-not $code) {
   throw "VS Code CLI ('code') not found on PATH after install."
 }
 else {
+  $extensionsPath = Join-Path $UserHomePath '.vscode\extensions'
   foreach ($ext in @('ms-toolsai.jupyter', 'ms-dotnettools.csharp', 'ms-python.python')) {
     Write-Host "==> code --install-extension $ext" -ForegroundColor Cyan
-    & $code --install-extension $ext --force
+    & $code --extensions-dir $extensionsPath --install-extension $ext --force
     if ($LASTEXITCODE -ne 0) { throw "Failed to install VS Code extension '$ext'." }
   }
 }
@@ -95,3 +122,7 @@ Write-Host "  - Open PowerShell 7, then run: az login"
 Write-Host "  - Change to $RepositoryPath and run: ./SetEnv.ps1"
 Write-Host "  - Dismiss the VS Code 'Sign in to GitHub' prompt (students use Azure accounts)."
 Write-Host "  - If a WSL update popup appears, press Enter to install."
+
+if ($SetupTaskName) {
+  Unregister-ScheduledTask -TaskName $SetupTaskName -Confirm:$false -ErrorAction SilentlyContinue
+}

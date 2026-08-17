@@ -20,7 +20,7 @@ resource dbAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
   tags: common.tags
   properties: {
     databaseAccountOfferType: 'Standard'
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: 'Disabled'
     disableLocalAuth: true
     capabilities: [
       { name: 'EnableNoSQLVectorSearch' }
@@ -118,5 +118,6 @@ resource ordersCompositeContainer 'Microsoft.DocumentDB/databaseAccounts/sqlData
 
 output accountName string = dbAccount.name
 output accountEndpoint string = dbAccount.properties.documentEndpoint
+output accountId string = dbAccount.id
 output throughputMode string = 'Provisioned with autoscale'
 output maxAutoScaleRU int = autoScaleMaxRU

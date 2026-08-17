@@ -66,10 +66,9 @@ var vmPropertiesBase = {
   additionalCapabilities: {
     hibernationEnabled: false
   }
-  osProfile: {
+  osProfile: union({
     computerName: vmComputerName
     adminUsername: adminUsername
-    adminPassword: adminPassword
     windowsConfiguration: {
       enableAutomaticUpdates: true
       provisionVMAgent: true
@@ -79,7 +78,7 @@ var vmPropertiesBase = {
         enableHotpatching: false
       }
     }
-  }
+  }, applyVmSecurityType ? { adminPassword: adminPassword } : {})
   diagnosticsProfile: {
     bootDiagnostics: {
       enabled: true
@@ -92,6 +91,7 @@ var vmSecurityProfile = applyVmSecurityType ? {
     securityType: 'Standard'
   }
 } : {}
+var initializerScript = loadTextContent('../../script/Initialize-LabVm.ps1')
 
 resource virtualMachine 'Microsoft.Compute/virtualMachines@2024-11-01' = {
   name: vmName
@@ -106,12 +106,24 @@ resource initializeLabVm 'Microsoft.Compute/virtualMachines/runCommands@2024-11-
   location: location
   properties: {
     source: {
-      script: loadTextContent('../../script/Initialize-LabVm.ps1')
+      script: replace(replace('''
+        $ErrorActionPreference = 'Stop'
+        $setupRoot = 'C:\LabSetup'
+        $setupScript = Join-Path $setupRoot 'Initialize-LabVm.ps1'
+        New-Item -ItemType Directory -Path $setupRoot -Force | Out-Null
+        [System.IO.File]::WriteAllBytes($setupScript, [Convert]::FromBase64String('__INITIALIZER_BASE64__'))
+
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setupScript -SetupPhase Machine
+        if ($LASTEXITCODE -ne 0) { throw "Machine setup failed with exit code $LASTEXITCODE." }
+
+        $localUser = '__ADMIN_USERNAME__'
+        $userHome = "C:\Users\$localUser"
+        $repositoryPath = "C:\Users\$localUser\Documents\cosmos-workshop-2026"
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setupScript -SetupPhase User -UserHomePath $userHome -RepositoryPath $repositoryPath
+        if ($LASTEXITCODE -ne 0) { throw "User profile setup failed with exit code $LASTEXITCODE." }
+        Unregister-ScheduledTask -TaskName InitializeLabVm -Confirm:$false -ErrorAction SilentlyContinue
+      ''', '__INITIALIZER_BASE64__', base64(initializerScript)), '__ADMIN_USERNAME__', adminUsername)
     }
-    parameters: []
-    protectedParameters: []
-    runAsUser: adminUsername
-    runAsPassword: adminPassword
     timeoutInSeconds: 7200
     asyncExecution: false
     treatFailureAsDeploymentFailure: true

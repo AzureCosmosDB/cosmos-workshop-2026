@@ -1,0 +1,1287 @@
+
+==================== 1B_SDK_CRUD ====================
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
+
+ENDPOINT = os.environ["COSMOS_ENDPOINT"]
+DB_NAME = "WorkshopData"
+CONT_NAME = "Catalog"
+
+print(f"COSMOS_ENDPOINT: {ENDPOINT}")
+print(f"Database: {DB_NAME}")
+print(f"Container: {CONT_NAME}")
+from azure.cosmos import CosmosClient, PartitionKey, exceptions
+from azure.identity import AzureCliCredential
+
+# Create the Cosmos client with the Azure CLI signed-in identity
+cred = AzureCliCredential()
+client = CosmosClient(url=ENDPOINT, credential=cred)
+
+# Get database and container proxies
+db = client.get_database_client(DB_NAME)
+container = db.get_container_client(CONT_NAME)
+print(f"Connected to: {ENDPOINT}{DB_NAME}/{CONT_NAME}")
+import uuid
+import json
+
+item_id = str(uuid.uuid4())
+
+item = {
+    "id": item_id,
+    "name": "Store Item #1",
+    "category": "workshop",
+    "partitionKey": "workshop",
+    "data": {"price": 42.0, "tags": ["cosmos", "demo"]}
+}
+
+try:
+    response = container.create_item(body=item)
+
+    print(f"Created item {response.get('id')}")
+except exceptions.CosmosHttpResponseError as ex:
+    if ex.status_code == 409:
+        print(f"Item {item_id} already exists")
+    else:
+        print(f"Error creating item: {ex.message}")
+except Exception as ex:
+    print(f"Error creating item: {ex}")
+from azure.cosmos import exceptions as cosmos_exceptions
+
+read_item_id = item_id
+read_partition_key = "workshop"
+
+try:
+    read_response = container.read_item(item=read_item_id, partition_key=read_partition_key)
+
+    print(json.dumps(read_response, indent=2))
+except cosmos_exceptions.CosmosResourceNotFoundError:
+    print(f"Item {read_item_id} not found")
+except Exception as ex:
+    print(f"Error reading item: {ex}")
+item = {
+    "id": item_id,
+    "name": "Store Item #1",
+    "category": "workshop",
+    "partitionKey": "workshop",
+    "data": {"price": 55.0, "tags": ["cosmos", "demo"]}
+}
+
+try:
+    upsert_response = container.upsert_item(body=item)
+
+    print(f"Upserted item {upsert_response.get('id')}")
+    print(f"New price: {upsert_response.get('data', {}).get('price')}")
+except Exception as ex:
+    print(f"Error upserting item: {ex}")
+partition_key = "workshop"
+
+try:
+    container.delete_item(item=item_id, partition_key=partition_key)
+    deleted_id = item_id
+
+    print(f"Deleted item {deleted_id}")
+except cosmos_exceptions.CosmosResourceNotFoundError:
+    print(f"Item {item_id} not found (may have already been deleted)")
+except Exception as ex:
+    print(f"Error deleting item: {ex}")
+
+
+==================== 1D1_Query_Language ====================
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
+
+ENDPOINT = os.environ.get("COSMOS_ENDPOINT")
+DB_NAME = "WorkshopData"
+CONT_NAME = "Catalog"
+
+if not ENDPOINT:
+    raise RuntimeError("COSMOS_ENDPOINT environment variable is required.")
+
+print(f"  endpoint: {ENDPOINT}")
+print(f"  database: {DB_NAME}")
+print(f"  container: {CONT_NAME}")
+print(f"  connected: {ENDPOINT}{DB_NAME}/{CONT_NAME}")
+from azure.cosmos import CosmosClient, PartitionKey
+from azure.identity import AzureCliCredential
+
+cred = AzureCliCredential()
+client = CosmosClient(url=ENDPOINT, credential=cred)
+db = client.get_database_client(DB_NAME)
+container = db.get_container_client(CONT_NAME)
+print(f"Connected to: {ENDPOINT}/{DB_NAME}/{CONT_NAME}")
+seed_items = [
+    {
+        "id": "1", "name": "Apples", "category": "fruit", "price": 1.20, "partitionKey": "grocery",
+        "tags": ["organic", "seasonal", "domestic"],
+        "nutrition": {"calories": 95, "vitamins": ["A", "C"]},
+    },
+    {
+        "id": "2", "name": "Broccoli", "category": "vegetable", "price": 2.50, "partitionKey": "grocery",
+        "tags": ["organic", "fresh"],
+        "nutrition": {"calories": 55, "vitamins": ["C", "K", "A"]},
+    },
+    {
+        "id": "3", "name": "Bananas", "category": "fruit", "price": 0.80, "partitionKey": "grocery",
+        "tags": ["imported", "ripe", "organic"],
+        "nutrition": {"calories": 105, "vitamins": ["B6", "C"]},
+    },
+    {
+        "id": "4", "name": "Carrots", "category": "vegetable", "price": 1.00, "partitionKey": "grocery",
+        "tags": ["organic", "root", "fresh"],
+        "nutrition": {"calories": 41, "vitamins": ["A", "K"]},
+    },
+    {
+        "id": "5", "name": "Dates", "category": "fruit", "price": 4.00, "partitionKey": "grocery",
+        "tags": ["imported", "dried", "premium"],
+        "nutrition": {"calories": 280, "vitamins": ["B6", "K"]},
+    },
+]
+
+for item in seed_items:
+    try:
+        response = container.upsert_item(body=item)
+        print(f"  Upserted: {item['name']}")
+    except Exception as ex:
+        print(f"  Error: {ex}")
+
+print(f"\nSeeded {len(seed_items)} items")
+category_to_query = "fruit"
+
+query = "SELECT * FROM c WHERE c.category = @cat"
+
+fruits = list(container.query_items(
+    query=query,
+    parameters=[{"name": "@cat", "value": category_to_query}],
+    enable_cross_partition_query=True
+))
+
+fruit_query_ru = float(container.client_connection.last_response_headers["x-ms-request-charge"])
+
+print(f"Found {len(fruits)} fruit items:")
+for f in fruits:
+    print(f"  {f['name']}: ${f['price']}")
+print(f"RU charged: {fruit_query_ru}")
+point_read_item = container.read_item(item="1", partition_key="grocery")
+point_read_ru = float(container.client_connection.last_response_headers["x-ms-request-charge"])
+
+single_item_query = "SELECT * FROM c WHERE c.id = @id"
+list(container.query_items(
+    query=single_item_query,
+    parameters=[{"name": "@id", "value": "1"}],
+    partition_key="grocery"
+))
+single_item_query_ru = float(container.client_connection.last_response_headers["x-ms-request-charge"])
+
+print("Fetching the same single item (id='1') two different ways.\n")
+print(f"Point read (1 item by id + partition key): {point_read_ru} RU")
+print(f"Query  (SELECT * FROM c WHERE c.id='1'):   {single_item_query_ru} RU")
+if point_read_ru > 0:
+    print(f"Point read is {single_item_query_ru / point_read_ru:.1f}x cheaper for fetching a single item by id.")
+limit_val = 3
+
+top_query = "SELECT TOP @limit c.name, c.price FROM c ORDER BY c.price DESC"
+
+top_items = list(container.query_items(
+    query=top_query,
+    parameters=[{"name": "@limit", "value": limit_val}],
+    enable_cross_partition_query=True
+))
+
+print(f"Top {limit_val} items by price:")
+for item in top_items:
+    print(f"  {item['name']}: ${item['price']}")
+json_query = (
+    "SELECT c.name, CONCAT(c.category, ' category') AS category, c.nutrition.calories "
+    "FROM c "
+    "WHERE ARRAY_CONTAINS(c.tags, 'organic') AND c.nutrition.calories < 100"
+)
+
+results = list(container.query_items(
+    query=json_query,
+    enable_cross_partition_query=True
+))
+
+json_query_ru = float(container.client_connection.last_response_headers["x-ms-request-charge"])
+
+print("Low-calorie organic items:")
+for item in results:
+    print(f"  {item['name']} ({item['category']}): {item['calories']} cal")
+print(f"RU charged: {json_query_ru}")
+subquery = (
+    "SELECT c.name, "
+    "       (SELECT VALUE COUNT(1) FROM v IN c.nutrition.vitamins) AS vitaminCount "
+    "FROM c "
+    "ORDER BY c.name"
+)
+
+results = list(container.query_items(
+    query=subquery,
+    enable_cross_partition_query=True
+))
+
+subquery_ru = float(container.client_connection.last_response_headers["x-ms-request-charge"])
+
+print("Vitamin counts per item:")
+for item in results:
+    print(f"  {item['name']}: {item['vitaminCount']} vitamins")
+print(f"RU charged: {subquery_ru}")
+
+
+==================== 1D2_Indexing ====================
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
+
+ENDPOINT = os.environ.get("COSMOS_ENDPOINT")
+DB_NAME = "WorkshopData"
+
+if not ENDPOINT:
+    raise RuntimeError("COSMOS_ENDPOINT environment variable is required.")
+
+print(f"Cosmos Endpoint: {ENDPOINT}")
+print(f"Database: {DB_NAME}")
+from azure.cosmos import CosmosClient, PartitionKey
+from azure.identity import AzureCliCredential
+
+cred = AzureCliCredential()
+client = CosmosClient(url=ENDPOINT, credential=cred)
+db = client.get_database_client(DB_NAME)
+print(f"Connected to: {ENDPOINT}/{DB_NAME}")
+default_container_name = "ItemsDefaultIndex"
+
+container_default = db.get_container_client(default_container_name)
+props = container_default.read()
+policy = props["indexingPolicy"]
+
+print(f"Container '{default_container_name}' found")
+print(f"  Indexing mode: {policy.get('indexingMode')}")
+print(f"  Included paths: {[p['path'] for p in policy.get('includedPaths', [])]}")
+print(f"  Excluded paths: {[p['path'] for p in policy.get('excludedPaths', [])]}")
+custom_container_name = "ItemsCustomIndex"
+
+container_custom = db.get_container_client(custom_container_name)
+
+props = container_custom.read()
+policy = props["indexingPolicy"]
+excluded = [p["path"] for p in policy.get("excludedPaths", [])]
+
+print(f"Container '{custom_container_name}' found")
+print(f"  Excluded paths: {excluded}")
+
+blob_excluded = any(p.startswith("/largeBlob/") for p in excluded)
+meta_excluded = any(p.startswith("/metadata/") for p in excluded)
+ok = blob_excluded and meta_excluded
+print("Custom indexing policy verified." if ok else "WARNING: expected /largeBlob and /metadata exclusions.")
+import random
+import string
+import uuid
+
+def compare_ru(label: str, payload: dict):
+    item_default = {"id": f"{label}_{uuid.uuid4().hex[:8]}", "partitionKey": "idx", **payload}
+    item_custom = {"id": f"{label}_{uuid.uuid4().hex[:8]}", "partitionKey": "idx", **payload}
+
+    container_default.create_item(body=item_default)
+    d_ru = float(container_default.client_connection.last_response_headers["x-ms-request-charge"])
+
+    container_custom.create_item(body=item_custom)
+    c_ru = float(container_custom.client_connection.last_response_headers["x-ms-request-charge"])
+
+    savings = d_ru - c_ru
+    pct = (savings / d_ru) * 100 if d_ru else 0
+    print(f"  Default index ~RU: {d_ru:.2f}")
+    print(f"  Custom index   ~RU: {c_ru:.2f}")
+    print(f"  RU savings: {savings:.2f} RU ({pct:.1f}%)")
+    return d_ru, c_ru
+
+# Scalar value at /largeBlob - excluded on the custom container via '/largeBlob/?'.
+# Use random characters instead of a single repeating char so the indexer can't
+# trivially compress/short-circuit the value.
+large_blob = "".join(random.choices(string.ascii_lowercase, k=10000))
+compare_ru("blob_test", {"largeBlob": large_blob})
+metadata = {f"tag{i}": f"value_{i}" for i in range(50)}
+compare_ru("meta_test", {"metadata": metadata})
+compare_ru("both_test", {"largeBlob": large_blob, "metadata": metadata})
+
+print("\n=== Lab Complete ===")
+print("You have completed the indexing policy exercise in Python. You:")
+print("- Inspected the default-indexing and custom-indexing containers")
+print("- Measured RU cost of excluding a large scalar value ('?' path)")
+print("- Measured RU cost of excluding a nested object subtree ('*' path)")
+print("- Saw how the two patterns combine on a richer document")
+print("\nKey takeaway: Excluding large scalar values and noisy nested structures from indexing can significantly reduce RU costs on write operations.")
+
+
+==================== 1E_Data_Modeling ====================
+# %pip install azure-cosmos azure-identity python-dotenv --quiet
+from dotenv import load_dotenv
+load_dotenv()
+
+import json
+import os
+from datetime import datetime, timezone
+from azure.cosmos import CosmosClient, PartitionKey
+from azure.cosmos.exceptions import CosmosResourceNotFoundError
+from azure.identity import AzureCliCredential
+
+ENDPOINT = os.environ.get("COSMOS_ENDPOINT")
+if not ENDPOINT:
+    raise RuntimeError("COSMOS_ENDPOINT environment variable is required (see SetEnv.ps1).")
+
+REF_DB_NAME = "ModelingReference"
+EMBED_DB_NAME = "ModelingEmbed"
+PROVISIONED_DB_NAME = "Modeling"
+
+PK_VALUE = "default"
+PK = PartitionKey(PK_VALUE)
+
+cred = AzureCliCredential()
+client = CosmosClient(url=ENDPOINT, credential=cred)
+ref_db = client.get_database_client(REF_DB_NAME)
+embed_db = client.get_database_client(EMBED_DB_NAME)
+
+# Lazily created when steps 5–7 run.
+provisioned_client = None
+provisioned_db = None
+
+def ensure_provisioned_client():
+    global provisioned_client, provisioned_db
+    if provisioned_client is not None:
+        return provisioned_db
+    endpoint = os.environ.get("COSMOS_ENDPOINT_PROVISIONED")
+    if not endpoint:
+        raise RuntimeError(
+            "Steps 5–7 require COSMOS_ENDPOINT_PROVISIONED."
+        )
+    provisioned_client = CosmosClient(url=endpoint, credential=cred)
+    provisioned_db = provisioned_client.get_database_client(PROVISIONED_DB_NAME)
+    print(f"  provisioned endpoint: {endpoint}")
+    print(f"  modeling DB:          {PROVISIONED_DB_NAME}")
+    return provisioned_db
+
+print(f"  serverless endpoint: {ENDPOINT}")
+print(f"  reference DB:        {REF_DB_NAME}")
+print(f"  embed DB:            {EMBED_DB_NAME}")
+with open("seed-reference.json", "r", encoding="utf-8") as f:
+    ref_seed = json.load(f)
+with open("seed-embed.json", "r", encoding="utf-8") as f:
+    embed_seed = json.load(f)
+
+def upsert_all(container, items):
+    for item in items:
+        container.upsert_item(body=item)
+        print(f"    upserted {container.id}/{item['id']}")
+    print(f"  -> {len(items)} docs in {container.id}")
+
+print(f"Seeding '{REF_DB_NAME}' (one container per entity) ...")
+upsert_all(ref_db.get_container_client("Customers"),         ref_seed["customers"])
+upsert_all(ref_db.get_container_client("Addresses"),         ref_seed["addresses"])
+upsert_all(ref_db.get_container_client("ProductCategories"), ref_seed["productCategories"])
+upsert_all(ref_db.get_container_client("Products"),          ref_seed["products"])
+upsert_all(ref_db.get_container_client("Orders"),            ref_seed["orders"])
+upsert_all(ref_db.get_container_client("OrderItems"),        ref_seed["orderItems"])
+
+print(f"\nSeeding '{EMBED_DB_NAME}' (denormalized — addresses on customer, lines on order) ...")
+upsert_all(embed_db.get_container_client("Customers"), embed_seed["customers"])
+upsert_all(embed_db.get_container_client("Products"),  embed_seed["products"])
+upsert_all(embed_db.get_container_client("Orders"),    embed_seed["orders"])
+def last_ru(container):
+    return float(container.client_connection.last_response_headers["x-ms-request-charge"])
+
+target_order_id = "order_001"
+total_ru = 0.0
+round_trips = 0
+
+orders     = ref_db.get_container_client("Orders")
+order_items= ref_db.get_container_client("OrderItems")
+products   = ref_db.get_container_client("Products")
+categories = ref_db.get_container_client("ProductCategories")
+customers  = ref_db.get_container_client("Customers")
+addresses  = ref_db.get_container_client("Addresses")
+
+order = orders.read_item(item=target_order_id, partition_key=PK_VALUE)
+ru = last_ru(orders); total_ru += ru; round_trips += 1
+print(f"  [1] Read Orders/{order['id']:<10}                              {ru:5.2f} RU")
+
+items = list(order_items.query_items(
+    query="SELECT * FROM c WHERE c.orderId = @orderId",
+    parameters=[{"name": "@orderId", "value": order["id"]}],
+    partition_key=PK_VALUE,
+))
+ru = last_ru(order_items); total_ru += ru; round_trips += 1
+print(f"  [2] Query OrderItems WHERE orderId='{order['id']}'    {ru:5.2f} RU ({len(items)} rows)")
+
+for item in items:
+    product = products.read_item(item=item["productId"], partition_key=PK_VALUE)
+    ru = last_ru(products); total_ru += ru; round_trips += 1
+    print(f"  [3] Read Products/{item['productId']:<10}                          {ru:5.2f} RU  ({product['name']})")
+
+    category = categories.read_item(item=product["categoryId"], partition_key=PK_VALUE)
+    ru = last_ru(categories); total_ru += ru; round_trips += 1
+    print(f"  [4] Read ProductCategories/{product['categoryId']:<10}              {ru:5.2f} RU  ({category['category']})")
+
+customer = customers.read_item(item=order["customerId"], partition_key=PK_VALUE)
+ru = last_ru(customers); total_ru += ru; round_trips += 1
+print(f"  [5] Read Customers/{order['customerId']:<10}                         {ru:5.2f} RU  ({customer['name']})")
+
+address = addresses.read_item(item=order["addressId"], partition_key=PK_VALUE)
+ru = last_ru(addresses); total_ru += ru; round_trips += 1
+print(f"  [6] Read Addresses/{order['addressId']:<10}                          {ru:5.2f} RU  ({address['street']}, {address['city']})")
+
+print(f"\n  Totals: {round_trips} round-trips, {total_ru:.2f} RU")
+embed_orders = embed_db.get_container_client("Orders")
+
+order = embed_orders.read_item(item="order_001", partition_key=PK_VALUE)
+ru = last_ru(embed_orders)
+
+print(f"  Read Orders/{order['id']}                              {ru:5.2f} RU")
+print(f"    customer:   {order['customerName']} <{order['customerId']}>")
+print(f"    ship to:    {order['customerStreet']}, {order['customerCity']}, {order['customerState']} {order['customerZipCode']}")
+print(f"    date/total: {order['date'][:10]}   ${order['totalAmount']:.2f}")
+print(f"    lines:")
+for line in order["lines"]:
+    print(f"      - {line['quantity']} x {line['productName']:<22} ({line['productCategory']:<12}) @ ${line['productPrice']:6.2f} = ${line['lineTotal']:7.2f}")
+
+print(f"\n  Totals: 1 round-trip, {ru:.2f} RU")
+customer_id = "cust_001"
+address_id = "addr_001"
+new_street, new_city, new_state, new_zip = "555 New Lane", "Bellevue", "WA", "98004"
+
+print("Reference model — update the single Addresses row; every order resolves it on next read.")
+ref_addresses = ref_db.get_container_client("Addresses")
+addr = ref_addresses.read_item(item=address_id, partition_key=PK_VALUE)
+addr["street"] = new_street
+addr["city"] = new_city
+addr["state"] = new_state
+addr["zipCode"] = new_zip
+ref_addresses.replace_item(item=address_id, body=addr)
+ru = last_ru(ref_addresses)
+print(f"  Replaced Addresses/{address_id}    {ru:.2f} RU  (1 write)")
+
+print("\nEmbed model — update the customer doc, but past orders still carry the old snapshotted address.")
+embed_customers = embed_db.get_container_client("Customers")
+cust = embed_customers.read_item(item=customer_id, partition_key=PK_VALUE)
+cust["addresses"][0]["street"] = new_street
+cust["addresses"][0]["city"] = new_city
+cust["addresses"][0]["state"] = new_state
+cust["addresses"][0]["zipCode"] = new_zip
+embed_customers.replace_item(item=customer_id, body=cust)
+ru = last_ru(embed_customers)
+print(f"  Replaced Customers/{customer_id}    {ru:.2f} RU")
+
+stale = embed_orders.read_item(item="order_001", partition_key=PK_VALUE)
+print(f"  order_001 ship-to (still snapshotted): {stale['customerStreet']}, {stale['customerCity']}")
+
+print("\nFanning out the update — query affected orders, replace each one (the change-feed pattern, inline).")
+affected = list(embed_orders.query_items(
+    query="SELECT * FROM c WHERE c.docType = 'order' AND c.customerId = @custId",
+    parameters=[{"name": "@custId", "value": customer_id}],
+    partition_key=PK_VALUE,
+))
+fan_out_ru = last_ru(embed_orders)
+for ord_doc in affected:
+    ord_doc["customerStreet"] = new_street
+    ord_doc["customerCity"] = new_city
+    ord_doc["customerState"] = new_state
+    ord_doc["customerZipCode"] = new_zip
+    embed_orders.replace_item(item=ord_doc["id"], body=ord_doc)
+    fan_out_ru += last_ru(embed_orders)
+
+print(f"  Fan-out replaced {len(affected)} order doc(s)    {fan_out_ru:.2f} RU")
+customer_name = "Alice Anderson"
+
+results = list(embed_orders.query_items(
+    query="SELECT * FROM c WHERE c.docType = 'order' AND c.customerName = @name",
+    parameters=[{"name": "@name", "value": customer_name}],
+    partition_key=PK_VALUE,
+))
+ru = last_ru(embed_orders)
+
+for o in results:
+    print(f"  - {o['id']} on {o['date'][:10]}   ${o['totalAmount']:.2f}")
+
+print(f"\n  {len(results)} order(s) for '{customer_name}', {ru:.2f} RU")
+PARTITION_DEMO_COUNT = 100
+HOT_CONTAINER_NAME = "OrdersHot"
+COMPOSITE_CONTAINER_NAME = "OrdersComposite"
+
+prov_db = ensure_provisioned_client()
+hot_container = prov_db.get_container_client(HOT_CONTAINER_NAME)
+
+today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+for i in range(PARTITION_DEMO_COUNT):
+    order = {
+        "id": f"order_{i}",
+        "customerId": f"CUST_{i % 50:03d}",
+        "orderDate": today,
+        "total": round(10 + (i * 3.33), 2),
+    }
+    hot_container.upsert_item(body=order)
+
+distinct = list(hot_container.query_items(
+    query="SELECT DISTINCT VALUE c.orderDate FROM c",
+    enable_cross_partition_query=True,
+))
+print(f"  Seeded {PARTITION_DEMO_COUNT} orders. Distinct /orderDate values across the container: {len(distinct)}")
+for v in distinct:
+    print(f"    - {v}")
+prov_db = ensure_provisioned_client()
+composite_container = prov_db.get_container_client(COMPOSITE_CONTAINER_NAME)
+
+props = composite_container.read()
+pk_paths = props["partitionKey"]["paths"]
+print(f"  Container '{COMPOSITE_CONTAINER_NAME}' partition key paths: {pk_paths}")
+
+for i in range(PARTITION_DEMO_COUNT):
+    customer_id = f"CUST_{i % 50:03d}"
+    pk = f"{customer_id}#{today}"
+    composite_container.upsert_item(body={
+        "id": f"order_{i}",
+        "customerId": customer_id,
+        "orderDate": today,
+        "partitionKey": pk,
+        "total": round(10 + (i * 3.33), 2),
+    })
+
+distinct = list(composite_container.query_items(
+    query="SELECT DISTINCT VALUE c.partitionKey FROM c",
+    enable_cross_partition_query=True,
+))
+print(f"  Seeded {PARTITION_DEMO_COUNT} orders. Distinct /partitionKey values across the container: {len(distinct)}")
+print(f"  '{HOT_CONTAINER_NAME}':       1 distinct partition-key value — all writes pinned to today's date.")
+print(f"  '{COMPOSITE_CONTAINER_NAME}': ~50 distinct partition-key values — one per (customer, day).")
+print()
+print("At production scale (>10k RU/s with multiple physical partitions) this distribution")
+print("shows up directly in Azure Monitor:")
+print("  Cosmos DB > Monitoring > Insights > Throughput > 'Normalized RU Consumption (Max)'")
+print("  By PartitionKeyRangeId — hot keys spike one bar, composite stays flat.")
+
+
+==================== 2C_Completions_Embeddings ====================
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
+
+ENDPOINT = os.environ.get("COSMOS_ENDPOINT")
+FOUNDRY_ENDPOINT = os.environ.get("FOUNDRY_ENDPOINT")
+EMBEDDINGS_ENDPOINT = os.environ.get("EMBEDDINGS_ENDPOINT")
+DB_NAME = "WorkshopData"
+COMPLETIONS_MODEL = os.environ.get("COMPLETIONS_MODEL", "gpt41")
+EMBEDDINGS_MODEL = os.environ.get("EMBEDDINGS_MODEL", "textembedding3small")
+
+for var in ["COSMOS_ENDPOINT", "FOUNDRY_ENDPOINT", "EMBEDDINGS_ENDPOINT"]:
+    if not os.environ.get(var):
+        raise RuntimeError(f"{var} environment variable is required.")
+
+print(f"Cosmos Endpoint:     {ENDPOINT}")
+print(f"Foundry Endpoint:    {FOUNDRY_ENDPOINT}")
+print(f"Embeddings Endpoint: {EMBEDDINGS_ENDPOINT}")
+print(f"Database:            {DB_NAME}")
+print(f"Completions Model:   {COMPLETIONS_MODEL}")
+print(f"Embeddings Model:    {EMBEDDINGS_MODEL}")
+from azure.cosmos import CosmosClient
+from azure.identity import AzureCliCredential, get_bearer_token_provider
+from openai import OpenAI
+
+cred = AzureCliCredential()
+cosmos_client = CosmosClient(url=ENDPOINT, credential=cred)
+db = cosmos_client.get_database_client(DB_NAME)
+print(f"Connected to: {ENDPOINT}/{DB_NAME}")
+
+# Chat completions: Foundry endpoint, Entra ID auth.
+foundry_token_provider = get_bearer_token_provider(cred, "https://ai.azure.com/.default")
+foundry_client = OpenAI(
+    base_url=f"{FOUNDRY_ENDPOINT.rstrip('/')}/openai/v1/",
+    api_key=foundry_token_provider,
+)
+
+# Embeddings: Cognitive Services endpoint, Entra ID auth.
+embeddings_token_provider = get_bearer_token_provider(cred, "https://cognitiveservices.azure.com/.default")
+embeddings_client = OpenAI(
+    base_url=f"{EMBEDDINGS_ENDPOINT.rstrip('/')}/openai/v1/",
+    api_key=embeddings_token_provider,
+)
+print("Foundry chat client + embeddings client initialized")
+messages = [
+    {"role": "system", "content": "You are a data platform expert."},
+    {"role": "user", "content": "Explain partitioning in Cosmos DB in 2 sentences."}
+]
+
+completion = foundry_client.chat.completions.create(
+    model=COMPLETIONS_MODEL,
+    messages=messages,
+    max_completion_tokens=200
+)
+completion_text = completion.choices[0].message.content
+usage = completion.usage
+
+print(f"Response: {completion_text}")
+print(f"Token usage - Prompt: {usage.prompt_tokens}, Completion: {usage.completion_tokens}")
+messages = [
+    {"role": "user", "content": "List 5 Cosmos DB consistency levels and their use cases."}
+]
+
+print("Streaming response: ", end="")
+
+for chunk in foundry_client.chat.completions.create(
+    model=COMPLETIONS_MODEL,
+    messages=messages,
+    stream=True,
+):
+    if chunk.choices and chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="", flush=True)
+import numpy as np
+
+
+def get_embedding(text: str) -> list[float]:
+    resp = embeddings_client.embeddings.create(input=text, model=EMBEDDINGS_MODEL)
+    return resp.data[0].embedding
+
+
+texts = [
+    "Azure Cosmos DB is globally distributed.",
+    "Microsoft Azure is a cloud platform.",
+    "Cosmos DB vector search supports semantic similarity.",
+]
+
+embeddings = []
+print("Generating embeddings:")
+for text in texts:
+    emb = get_embedding(text)
+    embeddings.append((text, emb))
+    print(f"  {text[:40]}... dim={len(emb)}")
+
+
+def cosine_similarity(a: list[float], b: list[float]) -> float:
+    a_arr = np.array(a)
+    b_arr = np.array(b)
+    denom = (np.linalg.norm(a_arr) * np.linalg.norm(b_arr))
+    if denom == 0:
+        return 0.0
+    return float(np.dot(a_arr, b_arr) / denom)
+
+
+similarity = cosine_similarity(embeddings[0][1], embeddings[2][1])
+print()
+print(f"Cosine similarity (docs 1 vs 3): {similarity:.4f}")
+print("Note: Higher value = more similar (range: -1 to 1)")
+
+
+==================== 2D_Vector_Search ====================
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
+
+ENDPOINT = os.environ.get("COSMOS_ENDPOINT")
+EMBEDDINGS_ENDPOINT = os.environ.get("EMBEDDINGS_ENDPOINT")
+EMBEDDINGS_MODEL = os.environ.get("EMBEDDINGS_MODEL", "textembedding3small")
+DB_NAME = "WorkshopData"
+CONT_NAME = "Docs"
+
+for var in ["COSMOS_ENDPOINT", "EMBEDDINGS_ENDPOINT"]:
+    if not os.environ.get(var):
+        raise RuntimeError(f"{var} environment variable is required.")
+
+print(f"Cosmos Endpoint:     {ENDPOINT}")
+print(f"Embeddings Endpoint: {EMBEDDINGS_ENDPOINT}")
+print(f"Database:            {DB_NAME}")
+print(f"Container:           {CONT_NAME}")
+print(f"Embeddings Model:    {EMBEDDINGS_MODEL}")
+from azure.cosmos import CosmosClient, PartitionKey
+from azure.identity import AzureCliCredential, get_bearer_token_provider
+from openai import OpenAI
+
+# Cosmos DB client (Entra ID auth)
+cred = AzureCliCredential()
+cosmos_client = CosmosClient(url=ENDPOINT, credential=cred)
+db = cosmos_client.get_database_client(DB_NAME)
+container = db.get_container_client(CONT_NAME)
+print(f"Connected to Cosmos DB: {ENDPOINT}/{DB_NAME}/{CONT_NAME}")
+
+# Embeddings client: Cognitive Services endpoint, Entra ID auth.
+embeddings_token_provider = get_bearer_token_provider(cred, "https://cognitiveservices.azure.com/.default")
+embeddings_client = OpenAI(
+    base_url=f"{EMBEDDINGS_ENDPOINT.rstrip('/')}/openai/v1/",
+    api_key=embeddings_token_provider,
+)
+print(f"Embeddings client initialized (deployment: {EMBEDDINGS_MODEL})")
+def embed_text(text: str) -> list[float]:
+    resp = embeddings_client.embeddings.create(input=text, model=EMBEDDINGS_MODEL)
+    return resp.data[0].embedding
+
+
+docs = [
+    {"id": "d1", "title": "Global Distribution", "text": "Azure Cosmos DB replicates your data across regions worldwide for low-latency access.", "partitionKey": "docs"},
+    {"id": "d2", "title": "Vector Search", "text": "Vector search retrieves documents by meaning, even when they share no keywords with the query.", "partitionKey": "docs"},
+    {"id": "d3", "title": "Provisioned Throughput", "text": "Provisioned throughput reserves request units per second for predictable performance.", "partitionKey": "docs"},
+]
+
+for doc in docs:
+    text = doc["text"]
+    doc["embedding"] = embed_text(text)
+    try:
+        container.upsert_item(body=doc)
+        ru = float(container.client_connection.last_response_headers["x-ms-request-charge"])
+        print(f"  Indexed: {doc['title']}")
+        print(f"  RU charged: {ru}")
+    except Exception as ex:
+        print(f"  Error indexing: {ex}")
+
+print(f"\nEmbedded {len(docs)} documents")
+search_text = "finding related information based on concepts instead of exact words"
+print(f"Searching for: {search_text}")
+print()
+
+query_embedding = embed_text(search_text)
+
+vector_query = """
+SELECT TOP 2 c.id, c.title, c.text, VectorDistance(c.embedding, @emb) AS score
+FROM c
+WHERE c.partitionKey = 'docs'
+ORDER BY VectorDistance(c.embedding, @emb)
+"""
+
+results = list(container.query_items(
+    query=vector_query,
+    parameters=[{"name": "@emb", "value": query_embedding}],
+    enable_cross_partition_query=True
+))
+
+print("Vector search results:")
+for r in results:
+    print(f"  Title: {r.get('title')}")
+    print(f"  Text:  {r.get('text')}")
+    print(f"  Score: {r.get('score')}")
+    print()
+search_text = "throughput"
+print(f"Searching for: {search_text}")
+print()
+
+fts_query = """
+SELECT * FROM c WHERE FullTextContains(c.text, @search) AND c.partitionKey = 'docs'
+"""
+
+results = list(container.query_items(
+    query=fts_query,
+    parameters=[{"name": "@search", "value": search_text}],
+    enable_cross_partition_query=True
+))
+
+print(f"Full-text search results for '{search_text}':")
+for r in results:
+    print(f"  ID:    {r.get('id')}")
+    print(f"  Title: {r.get('title')}")
+    print(f"  Text:  {r.get('text')}")
+    print()
+
+
+==================== 2E_RAG_Pipeline ====================
+# %pip install azure-cosmos azure-identity openai python-dotenv numpy --quiet
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
+
+ENDPOINT = os.environ.get("COSMOS_ENDPOINT")
+FOUNDRY_ENDPOINT = os.environ.get("FOUNDRY_ENDPOINT")
+EMBEDDINGS_ENDPOINT = os.environ.get("EMBEDDINGS_ENDPOINT")
+DB_NAME = "WorkshopData"
+CONT_NAME = "Docs"
+COMPLETIONS_MODEL = os.environ.get("COMPLETIONS_MODEL", "gpt41")
+EMBEDDINGS_MODEL = os.environ.get("EMBEDDINGS_MODEL", "textembedding3small")
+
+for var in ["COSMOS_ENDPOINT", "FOUNDRY_ENDPOINT", "EMBEDDINGS_ENDPOINT"]:
+    if not os.environ.get(var):
+        raise RuntimeError(f"{var} environment variable is required.")
+
+print(f"Cosmos Endpoint:     {ENDPOINT}")
+print(f"Foundry Endpoint:    {FOUNDRY_ENDPOINT}")
+print(f"Embeddings Endpoint: {EMBEDDINGS_ENDPOINT}")
+print(f"Database:            {DB_NAME}")
+print(f"Container:           {CONT_NAME}")
+print(f"Completions Model:   {COMPLETIONS_MODEL}")
+print(f"Embeddings Model:    {EMBEDDINGS_MODEL}")
+from azure.cosmos import CosmosClient, PartitionKey
+from azure.identity import AzureCliCredential, get_bearer_token_provider
+from openai import OpenAI
+
+# Cosmos DB client (Entra ID auth)
+cred = AzureCliCredential()
+cosmos_client = CosmosClient(url=ENDPOINT, credential=cred)
+db = cosmos_client.get_database_client(DB_NAME)
+container = db.get_container_client(CONT_NAME)
+print(f"Connected to: {ENDPOINT}/{DB_NAME}/{CONT_NAME}")
+
+# Chat completions: Foundry endpoint, Entra ID auth.
+foundry_token_provider = get_bearer_token_provider(cred, "https://ai.azure.com/.default")
+foundry_client = OpenAI(
+    base_url=f"{FOUNDRY_ENDPOINT.rstrip('/')}/openai/v1/",
+    api_key=foundry_token_provider,
+)
+
+# Embeddings: Cognitive Services endpoint, Entra ID auth.
+embeddings_token_provider = get_bearer_token_provider(cred, "https://cognitiveservices.azure.com/.default")
+embeddings_client = OpenAI(
+    base_url=f"{EMBEDDINGS_ENDPOINT.rstrip('/')}/openai/v1/",
+    api_key=embeddings_token_provider,
+)
+print("Foundry chat client + embeddings client initialized")
+def chunk_text(text: str, chunk_size: int = 512) -> list[str]:
+    sentences = text.split(". ")
+    chunks = []
+    current_chunk = []
+    current_size = 0
+    
+    for sentence in sentences:
+        if current_size + len(sentence) > chunk_size and current_chunk:
+            chunks.append(". ".join(current_chunk) + ".")
+            current_chunk = [sentence]
+            current_size = len(sentence)
+        else:
+            current_chunk.append(sentence)
+            current_size += len(sentence)
+    
+    if current_chunk:
+        chunks.append(". ".join(current_chunk) + ".")
+    
+    return chunks
+
+
+sample_docs = [
+    {"id": "doc1", "title": "Cosmos DB Overview", "content": "Azure Cosmos DB is a globally distributed, multi-model database service. It supports multiple API modes including SQL, MongoDB, Cassandra, Table, and Gremlin. Cosmos DB provides five consistency levels: Strong, Bounded Staleness, Session, Consistent Prefix, and Eventual."},
+    {"id": "doc2", "title": "Vector Search", "content": "Azure Cosmos DB supports vector indexing for semantic similarity search queries. Vector search enables finding semantically similar items by comparing embeddings. The VectorDistance function calculates similarity scores between vectors."},
+    {"id": "doc3", "title": "Data Modeling", "content": "Effective data modeling in Cosmos DB involves choosing the right partition key. Composite partition keys can help distribute load across partitions. Denormalization and fan-out patterns can optimize read performance."}
+]
+
+for doc in sample_docs:
+    chunks = chunk_text(doc["content"])
+    print(f"  Chunked '{doc['title']}': {len(chunks)} chunks")
+
+print(f"Total: {len(sample_docs)} documents loaded")
+def get_embedding(text: str) -> list[float]:
+    resp = embeddings_client.embeddings.create(input=text, model=EMBEDDINGS_MODEL)
+    return resp.data[0].embedding
+
+
+for doc in sample_docs:
+    chunks = chunk_text(doc["content"])
+
+    for i, chunk in enumerate(chunks):
+        embedding = get_embedding(chunk)
+
+        stored_doc = {
+            "id": f"{doc['id']}_chunk_{i}",
+            "title": doc["title"],
+            "text": chunk,
+            "embedding": embedding,
+            "source": doc["id"],
+            "partitionKey": "rag"
+        }
+
+        try:
+            container.upsert_item(body=stored_doc)
+            ru = float(container.client_connection.last_response_headers["x-ms-request-charge"])
+            print(f"  Stored chunk {i+1} of {doc['title']} (chunks={len(chunks)})")
+            print(f"  RU charged: {ru}")
+        except Exception as ex:
+            print(f"  Error storing chunk: {ex}")
+
+print("Chunk embedding and storage complete.")
+def retrieve_relevant(text_query: str, top_k: int = 3) -> list[dict]:
+    query_embedding = get_embedding(text_query)
+
+    vector_query = """
+    SELECT TOP @topk c.text, c.title, VectorDistance(c.embedding, @emb) AS score
+    FROM c
+    WHERE c.partitionKey = 'rag'
+    ORDER BY VectorDistance(c.embedding, @emb)
+    """
+
+    return list(container.query_items(
+        query=vector_query,
+        parameters=[
+            {"name": "@topk", "value": top_k},
+            {"name": "@emb", "value": query_embedding}
+        ],
+        partition_key="rag"
+    ))
+
+
+test_query = "What is vector search in Azure Cosmos DB?"
+print(f"Retrieving for: \"{test_query}\"\n")
+
+results = retrieve_relevant(test_query, 3)
+print(f"Found {len(results)} results:\n")
+for r in results:
+    text = r.get("text", "")
+    print(f"  Title: {r.get('title')}")
+    print(f"  Score: {r.get('score')}")
+    print(f"  Text:  {text[:100]}...\n")
+def generate_response(question: str) -> str:
+    results = retrieve_relevant(question, 3)
+    context = "\n\n".join(r.get("text", "") for r in results)
+
+    system_prompt = f"You are a helpful assistant. Answer the user's question based on the following context:\n\n<context>{context}</context>"
+
+    completion = foundry_client.chat.completions.create(
+        model=COMPLETIONS_MODEL,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": question}
+        ],
+        max_completion_tokens=500
+    )
+    return completion.choices[0].message.content
+
+
+test_question = "What is vector search in Azure Cosmos DB?"
+print(f"Question: {test_question}")
+answer = generate_response(test_question)
+print(f"\nAnswer:\n{answer}")
+
+
+==================== 2F_Evaluation ====================
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
+
+ENDPOINT = os.environ.get("COSMOS_ENDPOINT")
+FOUNDRY_ENDPOINT = os.environ.get("FOUNDRY_ENDPOINT")
+DB_NAME = "WorkshopData"
+CONT_NAME = "Docs"
+COMPLETIONS_MODEL = os.environ.get("COMPLETIONS_MODEL", "gpt41")
+EVAL_MODEL = os.environ.get("EVAL_MODEL", COMPLETIONS_MODEL)
+
+# This lab focuses on LLM-as-judge scoring; retrieval is mocked with a plain
+# Cosmos query (see generate_response), so no embeddings client is needed —
+# real embedding + vector search is covered in Labs 2D and 2E.
+for var in ["COSMOS_ENDPOINT", "FOUNDRY_ENDPOINT"]:
+    if not os.environ.get(var):
+        raise RuntimeError(f"{var} environment variable is required.")
+
+print(f"Cosmos Endpoint:   {ENDPOINT}")
+print(f"Foundry Endpoint:  {FOUNDRY_ENDPOINT}")
+print(f"Database:          {DB_NAME}")
+print(f"Completions Model: {COMPLETIONS_MODEL}")
+print(f"Eval Model:        {EVAL_MODEL}")
+from azure.cosmos import CosmosClient, PartitionKey
+from azure.identity import AzureCliCredential, get_bearer_token_provider
+from openai import OpenAI
+
+cred = AzureCliCredential()
+cosmos_client = CosmosClient(url=ENDPOINT, credential=cred)
+db = cosmos_client.get_database_client(DB_NAME)
+container = db.get_container_client(CONT_NAME)
+print(f"Connected to: {ENDPOINT}/{DB_NAME}/{CONT_NAME}")
+
+# Chat completions: Foundry endpoint, Entra ID auth.
+token_provider = get_bearer_token_provider(cred, "https://ai.azure.com/.default")
+foundry_client = OpenAI(
+    base_url=f"{FOUNDRY_ENDPOINT.rstrip('/')}/openai/v1/",
+    api_key=token_provider,
+)
+print("Foundry chat client initialized")
+eval_dataset = [
+    {"question": "What is Azure Cosmos DB?", "ground_truth": "Azure Cosmos DB is a globally distributed, multi-model database service from Microsoft."},
+    {"question": "What types of indexes does Cosmos DB support?", "ground_truth": "Range, spatial, composite, vector, and full-text indexes."},
+    {"question": "How do vector indexes differ from range indexes?", "ground_truth": "Vector indexes enable semantic similarity search on embeddings, while range indexes optimize numeric/string equality and ordering queries."}
+]
+
+print(f"Created {len(eval_dataset)} evaluation examples:")
+for example in eval_dataset:
+    print(f"  Q: {example['question']}")
+    print(f"  Ground truth: {example['ground_truth']}\n")
+import re
+
+
+def generate_response(question: str) -> str:
+    result = container.query_items(
+        query="SELECT TOP 3 c.text FROM c WHERE c.partitionKey = 'rag'",
+        partition_key="rag"
+    )
+    context = "\n\n".join(r.get("text", "") for r in result)
+    completion = foundry_client.chat.completions.create(
+        model=COMPLETIONS_MODEL,
+        messages=[
+            {"role": "system", "content": f"You are a helpful assistant. Answer based on: {context}"},
+            {"role": "user", "content": question}
+        ],
+        max_completion_tokens=500
+    )
+    return completion.choices[0].message.content
+
+
+scores = []
+for example in eval_dataset:
+    answer = generate_response(example["question"])
+
+    scoring_prompt = (
+        "Rate the answer's relevance to the question on a scale of 1 to 5.\n"
+        "Respond with ONLY a single digit (1, 2, 3, 4, or 5). No words, no punctuation, no explanation.\n\n"
+        f"Question: {example['question']}\n"
+        f"Answer: {answer}\n"
+        f"Ground truth: {example['ground_truth']}\n\n"
+        f"Score (single digit only):"
+    )
+
+    completion = foundry_client.chat.completions.create(
+        model=EVAL_MODEL,
+        messages=[{"role": "user", "content": scoring_prompt}],
+        max_completion_tokens=10
+    )
+    score_text = completion.choices[0].message.content.strip()
+
+    print(f"Q: {example['question'][:40]}...")
+    print(f"  Evaluating Answer: {answer[:60]}...")
+
+    m = re.search(r"[1-5]", score_text)
+    if m:
+        score = int(m.group(0))
+        scores.append(score)
+        print(f"  Score: {score}/5")
+    else:
+        print(f"  Score text could not be parsed: {score_text}")
+        scores.append(0)
+
+if scores:
+    avg = sum(scores) / len(scores)
+    print(f"\nAverage relevance score: {avg:.2f}/5")
+    print("Recommendation: score >4 = good, 3-4 = needs improvement, <3 = redesign RAG pipeline")
+
+
+==================== 4A_Chat_Memory ====================
+import os
+import uuid
+import json
+from datetime import datetime, timezone
+from azure.identity import AzureCliCredential, get_bearer_token_provider
+from azure.cosmos import CosmosClient, PartitionKey
+from azure.core.exceptions import HttpResponseError
+from openai import OpenAI
+
+# Cosmos DB connection
+cosmos_endpoint = os.environ["COSMOS_ENDPOINT"]
+credential = AzureCliCredential()
+cosmos_client = CosmosClient(cosmos_endpoint, credential)
+
+# Chat memory: Conversations/Messages (pre-provisioned, partition key /sessionId)
+chat_db_name = "Conversations"
+chat_container_name = "Messages"
+chat_database = cosmos_client.get_database_client(chat_db_name)
+chat_container = chat_database.get_container_client(chat_container_name)
+print(f"Chat memory: {cosmos_endpoint}{chat_db_name}/{chat_container_name}")
+
+# RAG corpus: WorkshopData/Docs (pre-provisioned with vector index on /embedding)
+rag_db_name = "WorkshopData"
+rag_container_name = "Docs"
+rag_database = cosmos_client.get_database_client(rag_db_name)
+rag_container = rag_database.get_container_client(rag_container_name)
+print(f"RAG corpus:  {cosmos_endpoint}{rag_db_name}/{rag_container_name}")
+
+# Model endpoints use Entra ID with service-specific token audiences.
+foundry_endpoint = os.environ["FOUNDRY_ENDPOINT"].rstrip('/')
+embeddings_endpoint = os.environ["EMBEDDINGS_ENDPOINT"].rstrip('/')
+chat_model = os.environ["COMPLETIONS_MODEL"]
+embeddings_model = os.environ["EMBEDDINGS_MODEL"]
+
+foundry_token_provider = get_bearer_token_provider(
+    credential, "https://ai.azure.com/.default"
+)
+foundry_client = OpenAI(
+    base_url=f"{foundry_endpoint}/openai/v1/",
+    api_key=foundry_token_provider,
+)
+
+embeddings_token_provider = get_bearer_token_provider(
+    credential, "https://cognitiveservices.azure.com/.default"
+)
+embeddings_client = OpenAI(
+    base_url=f"{embeddings_endpoint}/openai/v1/",
+    api_key=embeddings_token_provider,
+)
+
+session_id = str(uuid.uuid4())
+
+print(f"\nSession ID:       {session_id}")
+print(f"Chat Model:       {chat_model}")
+print(f"Embeddings Model: {embeddings_model}")
+def embed_text(text: str) -> list[float]:
+    resp = embeddings_client.embeddings.create(input=text, model=embeddings_model)
+    return resp.data[0].embedding
+
+
+with open("rag_seed_docs.json", "r", encoding="utf-8") as f:
+    rag_seed_docs = json.load(f)
+
+for doc in rag_seed_docs:
+    doc["partitionKey"] = "rag"
+    doc["embedding"] = embed_text(doc["text"])
+    rag_container.upsert_item(body=doc)
+    print(f"  Seeded: {doc['title']}")
+
+print(f"\nSeeded {len(rag_seed_docs)} docs into {rag_db_name}/{rag_container_name}")
+chat_message_schema = {
+    "id": "chat_20260524_001",
+    "sessionId": "user_session_001",
+    "timestamp": "2026-05-24T10:00:00Z",
+    "role": "assistant",
+    "content": "Hello! How can I help you with Cosmos DB today?",
+    "metadata": {
+        "model": "phi-4-mini-reasoning",
+        "latencyMs": 842,
+        "promptTokens": 312,
+        "completionTokens": 128,
+        "totalTokens": 440,
+        "ragHits": 3,
+        "retrievedDocIds": ["cosmos_overview", "cosmos_vector_search", "cosmos_request_units"]
+    }
+}
+
+print(json.dumps(chat_message_schema, indent=2))
+
+# The pre-provisioned 'Messages' container in Cosmos DB works for chat history.
+# Partition key path: /sessionId
+def generate_timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def save_chat_turn(session_id: str, role: str, content: str, metadata: dict | None = None) -> dict:
+    message = {
+        "id": f"{session_id}_{str(uuid.uuid4())[:8]}",
+        "sessionId": session_id,
+        "role": role,
+        "content": content,
+        "timestamp": generate_timestamp(),
+        "metadata": metadata or {}
+    }
+    return chat_container.create_item(body=message)
+
+
+# Test
+user_msg = save_chat_turn(session_id, "user", "What is Cosmos DB?")
+print(f"Saved user message: {user_msg['id']}")
+
+assistant_msg = save_chat_turn(
+    session_id,
+    "assistant",
+    "Azure Cosmos DB is a globally distributed database service.",
+    metadata={"model": chat_model, "latencyMs": 0, "totalTokens": 0}
+)
+print(f"Saved assistant message: {assistant_msg['id']}")
+def get_recent_messages(session_id: str, count: int = 10) -> list[dict]:
+    query = f"""SELECT * FROM c WHERE c.sessionId = @sessionId
+                ORDER BY c._ts DESC OFFSET 0 LIMIT {count}"""
+    return list(chat_container.query_items(
+        query=query,
+        parameters=[{"name": "@sessionId", "value": session_id}],
+        partition_key=session_id
+    ))
+
+
+def retrieve_relevant(query_text: str, top_k: int = 3) -> list[dict]:
+    query_embedding = embed_text(query_text)
+    vector_query = f"""SELECT TOP {top_k} c.id, c.title, c.text,
+                       VectorDistance(c.embedding, @emb) AS score
+                       FROM c WHERE c.partitionKey = 'rag'
+                       ORDER BY VectorDistance(c.embedding, @emb)"""
+    return list(rag_container.query_items(
+        query=vector_query,
+        parameters=[{"name": "@emb", "value": query_embedding}],
+        partition_key="rag"
+    ))
+
+
+recent = get_recent_messages(session_id, 10)
+print(f"Retrieved {len(recent)} recent messages:")
+for msg in recent:
+    print(f"  [{msg.get('role')}]: {msg.get('content')}")
+
+print("\n=== Retrieval check ===")
+for hit in retrieve_relevant("How does vector search work in Cosmos DB?", top_k=3):
+    print(f"  - [{hit.get('id')}] score={hit.get('score'):.4f}  {hit.get('title')}")
+import time
+
+base_system_prompt = "You are a helpful assistant specializing in Azure Cosmos DB."
+
+
+def chat_agent(sid: str, user_message: str) -> str:
+    save_chat_turn(sid, "user", user_message)
+
+    context = get_recent_messages(sid, 10)
+    ordered = list(reversed(context))
+    window = ordered[-6:] if len(ordered) > 6 else ordered
+    history = "\n".join(f"{m.get('role')}: {m.get('content')}" for m in window)
+
+    hits = retrieve_relevant(user_message, top_k=3)
+    context_text = "\n\n".join(f"{h.get('title')}: {h.get('text')}" for h in hits)
+
+    system_content = (
+        f"{base_system_prompt}\n\n"
+        f"Use the following retrieved context to ground your answer:\n{context_text}\n\n"
+        f"Chat history:\n{history}"
+    )
+
+    start = time.perf_counter()
+    completion = foundry_client.chat.completions.create(
+        model=chat_model,
+        messages=[
+            {"role": "system", "content": system_content},
+            {"role": "user", "content": user_message}
+        ],
+        max_completion_tokens=500
+    )
+    latency_ms = int((time.perf_counter() - start) * 1000)
+
+    answer = completion.choices[0].message.content
+    usage = completion.usage
+
+    metadata = {
+        "model": chat_model,
+        "latencyMs": latency_ms,
+        "promptTokens": getattr(usage, "prompt_tokens", 0),
+        "completionTokens": getattr(usage, "completion_tokens", 0),
+        "totalTokens": getattr(usage, "total_tokens", 0),
+        "ragHits": len(hits),
+        "retrievedDocIds": [h.get("id") for h in hits]
+    }
+    save_chat_turn(sid, "assistant", answer, metadata)
+    return answer
+
+
+user_message = "How does vector search work in Cosmos DB?"
+answer = chat_agent(session_id, user_message)
+print(f"\nAssistant: {answer}\n")
+# Edit this list to send one or more messages to the agent.
+# Each message runs in order; blank entries are skipped.
+# Re-run the cell after editing — history persists across runs.
+user_messages = [
+    "What is Cosmos DB?",
+    "How does that compare to a relational database?",
+]
+
+for user_message in user_messages:
+    user_message = user_message.strip()
+    if not user_message:
+        continue
+    print(f"You: {user_message}")
+    answer = chat_agent(session_id, user_message)
+    print(f"Assistant: {answer}")
+    print()
+final_history = get_recent_messages(session_id, 20)
+final_history.reverse()  # get_recent_messages returns newest-first; reverse to show chronological order
+print(f"Total messages in session '{session_id}': {len(final_history)}\n")
+
+for msg in final_history:
+    role_marker = "User" if msg["role"] == "user" else "Assistant"
+    print(f"{role_marker}: {msg['content']}")
+
+print("\n=== COMPLETE ===")
+

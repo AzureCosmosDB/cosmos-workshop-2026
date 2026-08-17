@@ -20,7 +20,7 @@ public class Steps_Indexing
 
     private CosmosClient CreateClient(string endpoint)
     {
-        var credential = new DefaultAzureCredential();
+        var credential = new AzureCliCredential();
 
         return new CosmosClient(endpoint, credential, new CosmosClientOptions
         {
