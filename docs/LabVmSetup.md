@@ -1,7 +1,4 @@
----
-title: Lab VM Setup
-description: Configure the Windows 11 lab VM with the SDKs, tools, and VS Code extensions required by the workshop.
----
+# Lab VM Setup
 
 Manual steps needed on a new lab VM to support the lab content. Based on the VM image configured in Bicep.
 

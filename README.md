@@ -1,7 +1,4 @@
----
-title: Azure Cosmos DB Workshop
-description: Persona-based entry point for students and trainers completing the Cosmos DB, Foundry, RAG, and Fabric workshop.
----
+# Azure Cosmos DB Workshop
 
 Build an application journey that starts with Azure Cosmos DB for NoSQL and
 progresses through Azure AI Foundry, vector search, retrieval-augmented

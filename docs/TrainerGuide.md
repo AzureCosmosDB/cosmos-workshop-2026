@@ -1,7 +1,4 @@
----
-title: Trainer Delivery Guide
-description: Step-by-step trainer flow for preparing, delivering, supporting, and closing the Azure Cosmos DB workshop.
----
+# Trainer Delivery Guide
 
 Use this guide to deliver the workshop after the Azure cohort has been
 provisioned. Azure deployment, roster generation, cost controls, and cleanup are

@@ -1,7 +1,4 @@
----
-title: Trainer Environment Setup Guide
-description: Provision, validate, and operate per-student Azure workshop environments.
----
+# Trainer Environment Setup Guide
 
 > Covers the pre-class environment provisioning workflow built around [script/provision-student-environments.ps1](../script/provision-student-environments.ps1) and [bicep/main.bicep](../bicep/main.bicep).
 

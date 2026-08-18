@@ -1,7 +1,4 @@
----
-title: Student Workshop Guide
-description: Step-by-step student flow for connecting to the workshop VM, configuring Azure access, and completing each lab.
----
+# Student Workshop Guide
 
 Follow this guide from top to bottom. Your trainer has already provisioned the
 Azure resources and workshop VM.
