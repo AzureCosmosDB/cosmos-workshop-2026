@@ -22,7 +22,7 @@ param fabricRegion string
 param fabricSkuName string
 
 @description('Deploy Microsoft Fabric capacity resources')
-param deployFabric bool = true
+param deployFabric bool = false
 
 @description('Deploy Azure AI Foundry resources')
 param deployFoundry bool = true
@@ -97,7 +97,6 @@ var cosmosDbName = 'cosmos${envName}${uniqueSuffix}'
 var cosmosDbProvisionedName = 'cosmos-provisioned-${envName}${uniqueSuffix}'
 var documentDbName = 'docdb-${envName}-${uniqueSuffix}'
 var aiFoundryName = 'aifoundry${envName}${uniqueSuffix}'
-var storageName = 'st${envName}${uniqueSuffix}'
 var fabricCapacityName = 'fabric${envName}${uniqueSuffix}'
 var vmName = 'lab-vm-${envName}-01'
 var ownerRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '8e3af657-a8ff-443c-a75c-2fe8c4bcb635')
@@ -162,41 +161,6 @@ module documentDb './modules/documentdb.bicep' = if (isDocDB) {
   }
 }
 
-// ========== AZURE STORAGE ======
-
-resource storageAccount 'Microsoft.Storage/storageAccounts@2022-05-01' = {
-  name: storageName
-  location: location
-  sku: {
-    name: 'Standard_LRS'
-  }
-  kind: 'StorageV2'
-  tags: tags
-  properties: {
-    accessTier: 'Hot'
-    supportsHttpsTrafficOnly: true
-    allowSharedKeyAccess: false
-    publicNetworkAccess: 'Disabled'
-    networkAcls: {
-      bypass: 'None'
-      defaultAction: 'Deny'
-    }
-  }
-}
-
-// RG-level Owner does not include Storage blob data-plane actions; grant them explicitly.
-var storageBlobDataContributorRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
-
-resource studentStorageBlobDataContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(studentOwnerObjectId)) {
-  scope: storageAccount
-  name: guid(storageAccount.id, studentOwnerObjectId, storageBlobDataContributorRoleId)
-  properties: {
-    roleDefinitionId: storageBlobDataContributorRoleId
-    principalId: studentOwnerObjectId
-    principalType: 'User'
-  }
-}
-
 // ========== AZURE AI FOUNDRY ======
 
 module foundry './modules/foundry.bicep' = if (deployFoundry) {
@@ -230,7 +194,6 @@ module privateEndpoints './modules/private-endpoints.bicep' = {
     deployCosmos: !isDocDB
     cosmosServerlessId: isDocDB ? '' : cosmosServerless!.outputs.accountId
     cosmosProvisionedId: isDocDB ? '' : cosmosProvisioned!.outputs.accountId
-    storageAccountId: storageAccount.id
     deployFoundry: deployFoundry
     foundryAccountId: deployFoundry ? foundry!.outputs.accountId : ''
   }
@@ -284,11 +247,11 @@ output bastionName string = networking.outputs.bastionName
 output bastionId string = networking.outputs.bastionId
 output vmId string = vm.outputs.vmId
 output vmAdminUsernameOut string = vmAdminUsername
-output storageAccountBlobEndpoint string = storageAccount.properties.primaryEndpoints.blob
+output storageAccountBlobEndpoint string = ''
 output fabricCapacityId string = deployFabric ? fabric!.outputs.capacityId : ''
 output cosmosAccountName string = isDocDB ? '' : cosmosDbName
 output cosmosProvisionedAccountName string = isDocDB ? '' : cosmosDbProvisionedName
 output documentDbClusterName string = isDocDB ? documentDb!.outputs.clusterName : ''
 output foundryAccountName string = deployFoundry ? aiFoundryName : ''
-output storageAccountName string = storageName
+output storageAccountName string = ''
 output vmName string = vmName

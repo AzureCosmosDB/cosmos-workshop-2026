@@ -28,12 +28,22 @@ function Update-PathFromRegistry {
 function Invoke-Chocolatey {
   param([Parameter(Mandatory)][string]$Package)
 
-  Write-Host "==> choco install $Package" -ForegroundColor Cyan
-  & choco.exe install $Package --yes --no-progress --limit-output
-  if ($LASTEXITCODE -ne 0) {
-    throw "choco install '$Package' failed with exit code $LASTEXITCODE."
+  for ($attempt = 1; $attempt -le 3; $attempt++) {
+    Write-Host "==> choco install $Package (attempt $attempt of 3)" -ForegroundColor Cyan
+    & choco.exe install $Package --yes --no-progress --limit-output
+    if ($LASTEXITCODE -eq 0) {
+      Update-PathFromRegistry
+      return
+    }
+
+    $exitCode = $LASTEXITCODE
+    if ($attempt -lt 3) {
+      Write-Warning "choco install '$Package' failed with exit code $exitCode; retrying in 15 seconds."
+      Start-Sleep -Seconds 15
+    }
   }
-  Update-PathFromRegistry
+
+  throw "choco install '$Package' failed after 3 attempts with exit code $exitCode."
 }
 
 if ($SetupPhase -in @('All', 'Machine')) {

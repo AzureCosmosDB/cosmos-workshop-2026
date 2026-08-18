@@ -5,7 +5,7 @@ param location = 'westus2'
 param resourceGroupName = 'lab-dev4'
 param fabricRegion = 'westus2'
 param fabricSkuName = 'F2'
-param deployFabric = true
+param deployFabric = false
 param deployFoundry = true
 param fabricAdminMembers = [
   'johnbowen@mannu2050gmail578.onmicrosoft.com'
@@ -13,7 +13,7 @@ param fabricAdminMembers = [
 param vmAdminUsername = 'lab_user1'
 param vmAdminPassword = '*****TODO*****'
 param vmComputerName = 'cosmos-lab-t'
-param applyVmSecurityType = false
+param applyVmSecurityType = true
 param vmSize = 'Standard_D4ds_v7'
 param diskControllerType = 'NVMe'
 param foundryDeploymentName = 'gpt5mini'

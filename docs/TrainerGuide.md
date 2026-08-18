@@ -1,15 +1,95 @@
-# Trainer Guide
+---
+title: Trainer Delivery Guide
+description: Step-by-step trainer flow for preparing, delivering, supporting, and closing the Azure Cosmos DB workshop.
+---
 
-> **Purpose:** this guide focuses on delivery (content, demos, troubleshooting) and assumes a provisioned cohort. **Environment provisioning lives in [TrainerEnvironmentSetup.md](TrainerEnvironmentSetup.md)**
+Use this guide to deliver the workshop after the Azure cohort has been
+provisioned. Azure deployment, roster generation, cost controls, and cleanup are
+covered in [Trainer Environment Setup](TrainerEnvironmentSetup.md).
 
-This guide is for instructors delivering the Cosmos DB + Foundry workshop. It covers:
+## Trainer workflow
 
-1. [Workshop overview](#workshop-overview)
-2. [Pre-workshop preparation](#pre-workshop-preparation)
-3. [Student setup](#student-setup)
-4. [Content Notes](#content-notes)
-5. [General Troubleshooting](#general-troubleshooting) including auth, RBAC, throttling, network, model availability
-6. [References](#references)
+### Step 1: Choose the delivery scope
+
+1. Review the [workshop overview](#workshop-overview) and content notes.
+2. Confirm the available session length and student experience level.
+3. Keep the core sequence through Lab 4A.
+4. Mark Lab 2F as optional when time is limited.
+5. Include Lab 4B only when a Fabric capacity and student workspaces are ready.
+
+### Step 2: Provision the cohort
+
+1. Complete [Trainer Environment Setup](TrainerEnvironmentSetup.md) at least 24
+  hours before class.
+2. Use shared Fabric for a cohort that includes Lab 4B. Do not deploy one Fabric
+  capacity per student.
+3. Retain the generated roster in a secure location.
+4. Confirm that each student has one shared portal and VM password.
+
+### Step 3: Validate one student environment
+
+1. Use one roster row exactly as a student would.
+2. Open its Bastion link and sign in to the VM.
+3. Run `az login`, `SetEnv.ps1`, and `1B_Account_Access.ps1`.
+4. Run the smoke test documented in
+  [Trainer Environment Setup](TrainerEnvironmentSetup.md#smoke-testing-one-student-environment).
+5. Validate Fabric separately when Lab 4B is included.
+6. Deallocate the validation VM until class begins.
+
+### Step 4: Prepare student handoff
+
+Send each student:
+
+* Their own roster row only
+* The [Student Workshop Guide](StudentEnvironmentSetup.md)
+* The class start time and support channel
+* The required language choice, if the class standardizes on C# or Python
+
+Do not send the full cohort roster to students.
+
+### Step 5: Start the class
+
+1. Start the student VMs before the session.
+2. Resume shared Fabric if Lab 4B is included.
+3. Introduce the workshop goals and four-part course journey.
+4. Give students time to complete Steps 1 through 4 of the student guide.
+5. Confirm that every student can run an authenticated Cosmos DB operation
+  before beginning the remaining labs.
+
+### Step 6: Deliver the workshop
+
+Follow this teaching sequence:
+
+1. Part 1: Cosmos DB resource model, SDK CRUD, query and indexing behavior,
+  data modeling, partitioning, security, and monitoring.
+2. Part 2: Foundry chat and embeddings, vector search, RAG, optional evaluation,
+  and model selection.
+3. Lab 4A: Persist conversational history and connect the earlier concepts into
+  an end-to-end application.
+4. Part 3 and Lab 4B: Mirror operational chat data into Fabric and analyze it
+  without consuming Cosmos DB request units.
+
+Use the [content notes](#content-notes) for timing, demo hooks, key points,
+prerequisites, and common questions.
+
+### Step 7: Monitor and unblock students
+
+1. Track progress at dependency points: 1B access, 2E before 2F, and 4A before
+  4B.
+2. Use the [general troubleshooting](#general-troubleshooting) tables before
+  changing infrastructure.
+3. Re-run idempotent setup or role-assignment scripts when a student falls
+  behind.
+4. Record recurring issues for the next delivery.
+
+### Step 8: Close the session
+
+1. Confirm that students have saved any required work.
+2. Deallocate all student VMs.
+3. Pause the shared Fabric capacity.
+4. Retain or delete the cohort according to the workshop retention policy.
+5. Follow the cleanup and cost guidance in
+  [Trainer Environment Setup](TrainerEnvironmentSetup.md#cleanup).
 
 ---
 
@@ -20,7 +100,7 @@ This guide is for instructors delivering the Cosmos DB + Foundry workshop. It co
 - Some general cloud experience preferred
 - Comfortable reading Python and/or C#; all labs provide both options
 - No prior Cosmos DB or Foundry experience assumed
-- Students don't need anything installed on their own machines other than RDP client; Lab VM is provided for running all labs
+- Students need only a supported browser on their own machines; the provided lab VM contains the workshop tools
 
 ### Scheduling
 
@@ -36,7 +116,11 @@ Provision the cohort at least 24 hours before class using [TrainerEnvironmentSet
 
 ## Student setup
 
-Self directed VM and account setup steps for students can be found in [StudentEnvironmentSetup.md](StudentEnvironmentSetup.md). The most common blocker will likely be the first-time Entra sign-in: students are forced to change their temp password and may be prompted to enroll MFA, so extra time may be needed for the slowest students.
+Student VM, account setup, language selection, and lab sequencing are in
+[StudentEnvironmentSetup.md](StudentEnvironmentSetup.md). The portal and VM use
+the same password, and password change at first sign-in is disabled. Tenant
+policy can still require additional authentication enrollment, so allow setup
+time for the slowest students.
 
 ---
 
@@ -56,7 +140,7 @@ Self directed VM and account setup steps for students can be found in [StudentEn
 
 - **Files:** [1B_SDK_CRUD/](../1B_SDK_CRUD/), `before/python/`, `before/csharp/` (lab steps in `before/csharp/Instructions.md`)
 - **Pre-flight:** Students must have run `1B_Account_Access.ps1` to apply RBAC data-plane roles for their accounts. The lab will 403 otherwise.
-- **Key points:** `DefaultAzureCredential` flow means no keys; `create_item` / `read_item` / `upsert_item` / `delete_item` are the common CRUD methods; item data structures require `id` and partition key value
+- **Key points:** `AzureCliCredential` uses the student's Azure CLI session with no account keys; `create_item` / `read_item` / `upsert_item` / `delete_item` are the common CRUD methods; item data structures require `id` and partition key value
 - **Demo hook:** Run the `before/` project as-is first to show the student-exercise stub output, then implement Step 1 live to model the workflow.
 - **Common questions:**
   - *"Why `partitionKey` and not `/partitionKey`?"* The slash form is the partition key *path* declaration on the container; the value in the document is just the property.
@@ -236,7 +320,7 @@ Self directed VM and account setup steps for students can be found in [StudentEn
   - *"How do I trim by token budget instead of count?"* Use `tiktoken` open source library to count tokens on each historical turn and pop oldest until under budget. The lab uses less granular count-based trimming for simplicity.
   - *"Why save user and assistant turns separately?"* Each is independently queryable, and the audit trail is cleaner. Storing as a transcript blob makes analytics harder.
 - **Troubleshooting:**
-  - **Auth failure on Foundry chat:** Lab 4 expects Entra; confirm user's Foundry endpoints and that **both** `Cognitive Services Contributor` and `Cognitive Services OpenAI Contributor` are assigned on the Foundry account to support `DefaultAzureCredential`. Roles are pre-granted at provisioning and re-applied by `1B_Account_Access.ps1`.
+  - **Auth failure on Foundry chat:** Lab 4 expects Entra; confirm user's Foundry endpoints and that **both** `Cognitive Services Contributor` and `Cognitive Services OpenAI Contributor` are assigned on the Foundry account to support `AzureCliCredential`. Roles are pre-granted at provisioning and re-applied by `1B_Account_Access.ps1`.
   
 
 #### 4B: Analyzing History Using Fabric Mirror (Lab, 40 min)
@@ -264,10 +348,10 @@ These come up regardless of section.
 | Symptom | Most likely cause | Fix |
 |---|---|---|
 | `Forbidden (403)` on first Cosmos call | Data-plane role not assigned to the signed-in user | Run `1B_Account_Access.ps1` with workshop-correct names |
-| `AADSTS50058` or login pops repeatedly | `DefaultAzureCredential` falling through credential chain | `az login` in a terminal, then restart VS Code |
+| `AADSTS50058` or login pops repeatedly | The Azure CLI session is missing or expired | Run `az login` in a terminal, then restart VS Code |
 | Foundry chat returns 401 in lab 4A | Lab 4 uses Entra, not key | Confirm `az login` succeeded and the Foundry role is assigned |
 | Foundry chat returns 403 in lab 2C / 4A with `lacks the required data action` | Lab 1B's Foundry role grants silently failed for this student (provisioning pre-grants `Cognitive Services Contributor` + `Cognitive Services OpenAI Contributor` as a backstop, so this usually means even those haven't propagated yet) | Wait 1–2 min and retry. If persistent, re-run `1B_Account_Access.ps1`, then restart the lab process (token cache) |
-| Embeddings call 401 in any 2x lab | Embeddings v1 endpoint requires `EMBEDDINGS_KEY`, not Entra | Confirm `EMBEDDINGS_KEY` is set in the student's env vars |
+| Embeddings call 401 in any 2x lab | The Azure CLI token is missing, expired, or lacks Foundry data-plane access | Run `az login`, confirm the Foundry roles, and restart the lab process |
 
 ### Throttling and capacity
 

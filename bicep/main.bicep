@@ -24,7 +24,7 @@ param fabricRegion string
 param fabricSkuName string
 
 @description('Deploy Microsoft Fabric capacity resources')
-param deployFabric bool = true
+param deployFabric bool = false
 
 @description('Deploy Azure AI Foundry resources')
 param deployFoundry bool = true

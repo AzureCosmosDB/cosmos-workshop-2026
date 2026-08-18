@@ -32,6 +32,9 @@ param(
   [switch]$NoFabric,
 
   [Parameter(Mandatory = $false)]
+  [switch]$PerStudentFabric,
+
+  [Parameter(Mandatory = $false)]
   [bool]$IsDocDB = $false,
 
   [Parameter(Mandatory = $false)]
@@ -89,6 +92,48 @@ function New-RandomPassword {
   -join ($chars | Sort-Object { Get-Random })
 }
 
+function Add-CsvRowWithRetry {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][psobject]$InputObject,
+    [Parameter(Mandatory = $false)][ValidateRange(1, 120)][int]$MaxAttempts = 30,
+    [Parameter(Mandatory = $false)][ValidateRange(1, 60)][int]$RetryDelaySeconds = 2
+  )
+
+  $csvLines = @($InputObject | ConvertTo-Csv -NoTypeInformation)
+  $encoding = [System.Text.UTF8Encoding]::new($false)
+
+  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+    try {
+      $stream = [System.IO.FileStream]::new(
+        $Path,
+        [System.IO.FileMode]::Append,
+        [System.IO.FileAccess]::Write,
+        [System.IO.FileShare]::Read
+      )
+      try {
+        $writer = [System.IO.StreamWriter]::new($stream, $encoding)
+        try {
+          $startIndex = if ($stream.Length -eq 0) { 0 } else { 1 }
+          for ($lineIndex = $startIndex; $lineIndex -lt $csvLines.Count; $lineIndex++) {
+            $writer.WriteLine($csvLines[$lineIndex])
+          }
+          $writer.Flush()
+        } finally {
+          if ($null -ne $writer) { $writer.Dispose() }
+        }
+      } finally {
+        if ($null -ne $stream) { $stream.Dispose() }
+      }
+      return
+    } catch [System.IO.IOException] {
+      if ($attempt -eq $MaxAttempts) { throw }
+      Write-Warning "Roster '$Path' is busy; retrying append ($attempt/$MaxAttempts)."
+      Start-Sleep -Seconds $RetryDelaySeconds
+    }
+  }
+}
+
 function Get-TenantDomain {
   param([string]$ExplicitDomain)
 
@@ -138,8 +183,8 @@ $csvPath = Join-Path $OutputDirectory "students-$batchId.csv"
 $results = New-Object System.Collections.Generic.List[object]
 $mirroringRbacFailures = New-Object System.Collections.Generic.List[string]
 
-if ($SharedFabric -and $NoFabric) {
-  throw '-SharedFabric and -NoFabric are mutually exclusive.'
+if (@($SharedFabric, $NoFabric, $PerStudentFabric).Where({ $_ }).Count -gt 1) {
+  throw '-SharedFabric, -NoFabric, and -PerStudentFabric are mutually exclusive.'
 }
 
 $sharedFabricCapacityId = $null
@@ -164,8 +209,10 @@ if ($NoFabric) {
   Write-Output "  Fabric mode:   none (skipped)"
 } elseif ($SharedFabric) {
   Write-Output "  Fabric mode:   shared ($SharedFabricCapacityName in $SharedFabricResourceGroup)"
+} elseif ($PerStudentFabric) {
+  Write-Output "  Fabric mode:   per-student (F2 by default)"
 } else {
-  Write-Output "  Fabric mode:   per-student (from bicepparam)"
+  Write-Output "  Fabric mode:   none (default; use -SharedFabric or -PerStudentFabric for Lab 4B)"
 }
 Write-Output ""
 
@@ -185,7 +232,7 @@ for ($batchStart = 1; $batchStart -le $StudentCount; $batchStart += $MaxParallel
   $studentAlias = "lab_user${studentNumber}_${batchId}"
   $studentUpn = "$studentAlias@$tenantDomain"
   $studentPassword = New-RandomPassword
-  $vmAdminPassword = New-RandomPassword
+  $vmAdminPassword = $studentPassword
   # Escape embedded quotes so the JSON survives PowerShell -> az.cmd argv marshaling on Windows.
   # Without this, the inner quotes are stripped and az sees {key:value,...} instead of {"key":"value",...}.
   $tagsJson = @{
@@ -220,7 +267,7 @@ $fabricMembersFile = Join-Path $OutputDirectory "fabric-admins-$batchId-$index.j
     --display-name $studentDisplayName `
     --user-principal-name $studentUpn `
     --password $studentPassword `
-    --force-change-password-next-sign-in true `
+    --force-change-password-next-sign-in false `
     --mail-nickname $studentAlias `
     --only-show-errors | Out-Null
   Assert-LastAzCommand -FailureMessage "Failed to create Entra user '$studentUpn'."
@@ -240,13 +287,16 @@ $fabricMembersFile = Join-Path $OutputDirectory "fabric-admins-$batchId-$index.j
     '--parameters', "resourceGroupName=$resourceGroupName",
     '--parameters', "vmAdminUsername=$vmAdminUser",
     '--parameters', "vmAdminPassword=$vmAdminPassword",
+    '--parameters', 'applyVmSecurityType=true',
     '--parameters', "vmComputerName=$vmComputerName",
     '--parameters', "studentOwnerObjectId=$studentObjectId",
     '--parameters', "isDocDB=$($IsDocDB.ToString().ToLowerInvariant())",
     '--parameters', "tags=@$tagsFile",
     '--parameters', "fabricAdminMembers=@$fabricMembersFile"
   )
-  if ($SharedFabric -or $NoFabric) {
+  if ($PerStudentFabric) {
+    $deployParams += @('--parameters', 'deployFabric=true')
+  } else {
     $deployParams += @('--parameters', 'deployFabric=false')
   }
   if ($VmSize) {
@@ -280,11 +330,45 @@ $fabricMembersFile = Join-Path $OutputDirectory "fabric-admins-$batchId-$index.j
       VmAdminUser = $vmAdminUser
       VmAdminPassword = $vmAdminPassword
       VmComputerName = $vmComputerName
+      WaitDeadlineUtc = [DateTime]::UtcNow.AddSeconds(7200)
     }) | Out-Null
   }
 
   Write-Output "Waiting for deployment batch $batchStart-$batchEnd."
-  foreach ($pendingDeployment in $pendingDeployments) {
+  while ($pendingDeployments.Count -gt 0) {
+    $pendingDeployment = $null
+    $deploymentState = $null
+    $failedDeployment = $null
+    $failedDeploymentState = $null
+
+    foreach ($candidate in $pendingDeployments) {
+      $candidateState = [string](& az deployment sub show --name $candidate.DeploymentName --query properties.provisioningState -o tsv 2>$null)
+      $stateQuerySucceeded = $LASTEXITCODE -eq 0
+      $candidateState = $candidateState.Trim()
+
+      if ($stateQuerySucceeded -and $candidateState -eq 'Succeeded') {
+        $pendingDeployment = $candidate
+        $deploymentState = $candidateState
+        break
+      }
+      if ($stateQuerySucceeded -and $candidateState -in @('Failed', 'Canceled') -and $null -eq $failedDeployment) {
+        $failedDeployment = $candidate
+        $failedDeploymentState = $candidateState
+      } elseif ([DateTime]::UtcNow -ge $candidate.WaitDeadlineUtc -and $null -eq $failedDeployment) {
+        $failedDeployment = $candidate
+        $failedDeploymentState = 'TimedOut'
+      }
+    }
+
+    if ($null -eq $pendingDeployment) {
+      $pendingDeployment = $failedDeployment
+      $deploymentState = $failedDeploymentState
+    }
+    if ($null -eq $pendingDeployment) {
+      Start-Sleep -Seconds 15
+      continue
+    }
+
     $studentLabel = $pendingDeployment.StudentLabel
     $studentUpn = $pendingDeployment.StudentUpn
     $studentPassword = $pendingDeployment.StudentPassword
@@ -296,18 +380,9 @@ $fabricMembersFile = Join-Path $OutputDirectory "fabric-admins-$batchId-$index.j
     $vmAdminPassword = $pendingDeployment.VmAdminPassword
     $vmComputerName = $pendingDeployment.VmComputerName
 
-    Write-Output "[$studentLabel] waiting for deployment $deploymentName"
-    az deployment sub wait `
-      --name $deploymentName `
-      --custom "properties.provisioningState=='Succeeded' || properties.provisioningState=='Failed' || properties.provisioningState=='Canceled'" `
-      --timeout 7200 `
-      --only-show-errors
-    $waitExitCode = $LASTEXITCODE
-    $deploymentState = (& az deployment sub show --name $deploymentName --query properties.provisioningState -o tsv 2>$null).Trim()
-
     # The asynchronous launch is attempt 1. Retry transient ARM failures synchronously
     # against the same deployment and resource group so ARM resumes from current state.
-    if ($waitExitCode -ne 0 -or $LASTEXITCODE -ne 0 -or $deploymentState -ne 'Succeeded') {
+    if ($deploymentState -ne 'Succeeded') {
       $deploymentAttempts = 3
       $deploymentDelaySeconds = 45
       $retryParams = $pendingDeployment.DeployParams
@@ -380,11 +455,8 @@ $fabricMembersFile = Join-Path $OutputDirectory "fabric-admins-$batchId-$index.j
 
   # Stream this student's row to the roster immediately so a mid-batch failure
   # still leaves a usable record of every student provisioned up to that point.
-  if ($results.Count -eq 1) {
-    $rowObject | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
-  } else {
-    $rowObject | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8 -Append
-  }
+  Add-CsvRowWithRetry -Path $csvPath -InputObject $rowObject
+  $pendingDeployments.Remove($pendingDeployment) | Out-Null
   }
 }
 

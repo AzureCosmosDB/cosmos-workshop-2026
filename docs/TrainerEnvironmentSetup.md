@@ -7,7 +7,7 @@ description: Provision, validate, and operate per-student Azure workshop environ
 
 1. [Deployment modes](#deployment-modes)
 2. [What the script provisions](#what-the-script-provisions)
-3. [Prerequisites](#prerequisites)
+3. [Prerequisites](#environment-setup-prerequisites)
 4. [Shared Fabric setup (batch mode, one-time)](#shared-fabric-setup-batch-mode-one-time)
 5. [Running the provisioning script](#running-the-provisioning-script)
 6. [Configuring per-student Fabric workspaces (batch mode)](#configuring-per-student-fabric-workspaces-batch-mode)
@@ -26,7 +26,7 @@ The same Bicep tree supports two modes:
 
 1. **Single-user test**
 - When to use: Trainer validates a lab end-to-end before class
-- Fabric handling: Per-RG F2 capacity (current bicepparam default)
+- Fabric handling: Disabled by default; add `-PerStudentFabric` only when validating Lab 4B
 - Script invocation: `provision-student-environments.ps1 -StudentCount 1`
 
 2. **Batch (shared Fabric SKU)**
@@ -34,7 +34,8 @@ The same Bicep tree supports two modes:
   - Fabric handling: One shared F-SKU in `lab-shared-fabric`; per-student deployments skip Fabric
   - Script invocation: `provision-shared-fabric.ps1` (once), then `provision-student-environments.ps1 -StudentCount N -SharedFabric`, then `configure-student-fabric.ps1`
 
-The bicepparam stays at `deployFabric = true` so single-user manual testing is unaffected. The `-SharedFabric` switch overrides that to `false` per deployment.
+Fabric is disabled by default. Use `-SharedFabric` for a cohort or
+`-PerStudentFabric` for an isolated Lab 4B validation environment.
 
 ---
 
@@ -42,15 +43,14 @@ The bicepparam stays at `deployFabric = true` so single-user manual testing is u
 
 For each student, the script creates:
 
-- **One Entra ID user**: `lab_user{N}_{batchId}@<tenant-default-domain>`, display name `{MMdd-HHmm} Lab User {N}` (the batch-time prefix groups all students from one class together when the Entra users blade is sorted by display name), with a randomly-generated temp password and "force change at next sign-in" set.
+- **One Entra ID user**: `lab_user{N}_{batchId}@<tenant-default-domain>`, display name `{MMdd-HHmm} Lab User {N}` (the batch-time prefix groups all students from one class together when the Entra users blade is sorted by display name), with one randomly generated password shared by the portal and VM accounts. Password change at next sign-in is disabled so both credentials remain aligned.
 - **One resource group**: `lab-dev{N}-{batchId}`, with the student granted **Owner** on that RG only (via [main.resources.bicep](../bicep/main.resources.bicep) `studentOwnerAssignment`). The student is also pre-granted **Cognitive Services Contributor** and **Cognitive Services OpenAI Contributor** on the Foundry account as a backstop against silent failures of the Lab 1B role grant — Owner alone does not include the OpenAI data actions, and the two-role pairing covers historical drift in which actions each role includes.
 - **All workshop resources inside that RG**, deployed by [main.bicep](../bicep/main.bicep):
   - Cosmos DB serverless account (`cosmosl{N}<unique>`)
   - Cosmos DB provisioned-autoscale account with two containers (`OrdersHot`, `OrdersComposite`), each set to autoscale 100–1000 RU (`cosmos-provisioned-l{N}<unique>`)
   - Azure AI Foundry account with `gpt-5-mini` chat deployment and `text-embedding-3-small` embeddings (`aifoundryl{N}<unique>`)
-  - Storage account (`stl{N}<unique>`)
-  - Microsoft Fabric capacity, **F2 SKU per student** — only when `deployFabric=true` (default in single-user test mode; omitted in batch mode via `-SharedFabric`). See [Cost considerations](#cost-considerations)
-  - Lab VM (`Standard_D4ds_v7`, Windows, computer name `cosmos-lab{N}`) with public IP + NSG + VNet
+  - Microsoft Fabric capacity, **F2 SKU per student** only with `-PerStudentFabric`. See [Cost considerations](#cost-considerations)
+  - Lab VM (`Standard_D4ds_v7` by default, Windows, computer name `cosmos-lab{N}`) on a private VNet
   - Azure Bastion Standard with shareable links, a dedicated public IP, and `AzureBastionSubnet` for browser-based VM access without Azure Portal authentication
 - **A roster CSV** at `out/students-{batchId}.csv` containing UPN, temp password, RG name, VM FQDN, VM admin user/password, and all account names.
 
@@ -73,7 +73,9 @@ Student number is used across multiple resources for easy visual confirmation, f
 | Region quota in `-Location` | VM SKU, AI Foundry chat/embedding model TPM, and Fabric SKU all consume per-region quota |
 | Time | Roughly 5-15 min per student (Fabric and Cosmos DB are slowest); script runs sequentially |
 
-> Plan to provision at least 24 hours before class. Model deployments and Fabric capacity can take that long to settle, and students need a window for their first-login password change.
+> Plan to provision at least 24 hours before class. Model deployments, role
+> assignments, and Fabric capacity can take time to settle, and the trainer
+> needs enough time to complete an end-to-end smoke test.
 
 ---
 
@@ -101,8 +103,11 @@ F2 is the smallest paid Fabric SKU and is sufficient for the small mirror + T-SQ
 az login
 az account set --subscription "<workshop-subscription-id-or-name>"
 
-# Single-user test (Fabric included)
+# Single-user test (Fabric omitted)
 ./script/provision-student-environments.ps1 -StudentCount 1
+
+# Isolated Lab 4B validation (per-student F2)
+./script/provision-student-environments.ps1 -StudentCount 1 -PerStudentFabric
 
 # Batch (per-student Fabric skipped; assumes shared capacity is already deployed)
 ./script/provision-student-environments.ps1 -StudentCount 12 -SharedFabric
@@ -119,6 +124,8 @@ az account set --subscription "<workshop-subscription-id-or-name>"
 | `-BicepparamFile` | `../bicep/main.bicepparam` | Fork for custom SKUs / model names |
 | `-OutputDirectory` | `../out` | Roster CSV destination |
 | `-SharedFabric` | off | Sets `deployFabric=false` per deployment; records shared capacity ID in the roster |
+| `-PerStudentFabric` | off | Deploys one F2 capacity in each student resource group; use only for isolated Lab 4B validation |
+| `-NoFabric` | off | Explicitly confirms that Fabric is omitted; omission is also the default |
 | `-SharedFabricResourceGroup` | `lab-shared-fabric` | Override only if `provision-shared-fabric.ps1` used a non-default RG name |
 | `-SharedFabricCapacityName` | `fabricworkshopshared` | Override only if `provision-shared-fabric.ps1` used a non-default capacity name |
 | `-MaxParallelDeployments` | `5` | Number of student ARM deployments started concurrently; reduce if the subscription reaches regional quota or API throttling limits |
@@ -129,8 +136,8 @@ az account set --subscription "<workshop-subscription-id-or-name>"
 2. If `-SharedFabric`: looks up the shared capacity resource ID; throws if not found.
 3. Resolves the tenant default domain.
 4. Processes students in concurrent batches controlled by `-MaxParallelDeployments`. For each student N:
-   1. Generates Windows-complexity-compliant passwords (student temp + VM admin).
-   2. Creates the Entra user with `--force-change-password-next-sign-in true`.
+  1. Generates one Windows-complexity-compliant password for both the Entra user and VM admin account.
+  2. Creates the Entra user with `--force-change-password-next-sign-in false`.
    3. Reads back the user's object ID.
    4. `az deployment sub what-if` against [main.bicep](../bicep/main.bicep) (validates parameters).
   5. Starts `az deployment sub create --no-wait` so other students in the batch can begin deploying. The script then waits for each deployment and retries failures up to **3 times with a 45-second backoff** between attempts. ARM deployments are idempotent, so a retry resumes from the current state rather than starting over. This handles the most common transient failure mode: an AI Foundry / Cognitive Services `RequestConflict` race where a child resource (project or model deployment) tries to attach to the account before its provisioning state has settled.
@@ -204,8 +211,7 @@ After a successful run, each `lab-dev{N}-{batchId}` resource group should contai
 | Cosmos DB (serverless) | `cosmosl{N}<unique>` | Used by labs 1B, 1D1, 1D2, 2*, 4A |
 | Cosmos DB (provisioned) | `cosmos-provisioned-l{N}<unique>` | Used by lab 1E (partition-key metrics demo) |
 | AI Foundry account | `aifoundryl{N}<unique>` | Hosts both chat (`gpt5mini`) and embedding (`textembedding3small`) deployments. Student is pre-granted **Cognitive Services Contributor** + **Cognitive Services OpenAI Contributor** on this account at provisioning. Lab 1B grants the same two roles again as a teaching exercise (the duplicate assignments are idempotent no-ops) |
-| Storage account | `stl{N}<unique>` | General-purpose |
-| Fabric capacity | `fabricl{N}<unique>` | **Single-user test mode only.** F2 SKU. Omitted under `-SharedFabric` |
+| Fabric capacity | `fabricl{N}<unique>` | Created only with `-PerStudentFabric`. Omitted by default and under `-SharedFabric` |
 | VNet / Subnet / NSG / PIP / NIC | per VM | Networking for the lab VM |
 | Azure Bastion | `l{N}-bastion` | Standard SKU with a tokenized shareable link for browser-based VM access |
 | VM | `lab-vm-l{N}-01` | Windows, `Standard_D4ds_v7`, computer name `cosmos-lab{N}`, admin `lab_user{N}` |
@@ -220,7 +226,7 @@ The `<unique>` suffix is a deterministic hash of the RG resource ID — same RG 
 
 Batch mode appends: `FabricSharedCapacityId, FabricSharedCapacityName, FabricWorkspaceId, FabricWorkspaceName`. The last two are blank after `provision-student-environments.ps1` and are populated by `configure-student-fabric.ps1`.
 
-> **CSV includes secrets.** It contains two passwords per student. Distribute over a secure channel.
+> **CSV includes secrets.** `TempPassword` and `VmAdminPassword` contain the same password. Distribute the roster over a secure channel.
 
 ---
 
@@ -233,7 +239,10 @@ Each student needs these values to start:
 3. Entra login (used inside the VM for Azure services) — `UserPrincipalName` + `TempPassword`
 4. A pointer to [docs/StudentEnvironmentSetup.md](StudentEnvironmentSetup.md)
 
-The Entra temp password forces a change at first sign-in. Students should be aware they'll be prompted to pick a new password the first time they run `az login` or open the Azure Portal. In the browser they may also be required to set up additional authentication with an Authenticator app.
+The Entra and VM accounts use the same generated password. Password change at
+first sign-in is disabled so the credentials remain aligned. Tenant policy can
+still require additional authentication enrollment when students run `az login`
+or open Azure Portal.
 
 ---
 
@@ -284,7 +293,7 @@ Before class, log in as one student end-to-end. Catches RBAC propagation lag, mo
 
 ### Mid-run failure recovery
 
-The roster CSV is streamed row-by-row as each student completes, so `out/students-{batchId}.csv` already contains every successfully-provisioned student up to the failure. Students 1..N-1 are usable as-is — their UPNs, passwords, RGs, and VM details are all in the CSV.
+The roster CSV is streamed row-by-row in deployment completion order. The script uses an exclusive append lock with retries, so `out/students-{batchId}.csv` retains every successfully provisioned student even when another process briefly reads the file or an earlier deployment in the batch is still running.
 
 For the in-progress student N (and any not-yet-started students):
 
@@ -313,13 +322,26 @@ The script is idempotent — re-run for the same roster to retry failed rows. Su
 
 ### Bicep param drift
 
-The provisioning script overrides: `envName`, `location`, `resourceGroupName`, `vmAdminUsername`, `vmAdminPassword`, `vmComputerName`, `studentOwnerObjectId`, `tags`, and (in `-SharedFabric` mode) `deployFabric=false`. Everything else comes from [main.bicepparam](../bicep/main.bicepparam) — edit the param file to change SKUs or model names.
+The provisioning script overrides: `envName`, `location`, `resourceGroupName`, `vmAdminUsername`, `vmAdminPassword`, `vmComputerName`, `applyVmSecurityType=true`, `studentOwnerObjectId`, `tags`, and `deployFabric`. Everything else comes from [main.bicepparam](../bicep/main.bicepparam). Edit the parameter file to change SKUs or model names.
 
 ---
 
 ## Cost considerations
 
-All figures below are rough planning estimates based on `westus` list prices. Confirm against the Azure pricing calculator before committing to a cohort budget.
+Cost Management recorded **INR 1,483.98 per fully active day** for the validated
+`westus3` environment on August 15-16, 2026. The measured daily breakdown was:
+
+| Service | Actual daily cost |
+|---|---:|
+| Azure Bastion Standard | INR 665.72 |
+| VM compute (`Standard_D2ds_v7` in the measured deployment) | INR 585.38 |
+| Virtual Network (private endpoints and public IPs) | INR 114.78 |
+| VM OS disk | INR 55.29 |
+| Cosmos DB | INR 55.09 |
+| Private DNS | INR 7.71 |
+
+The measured environment accumulated INR 5,004.18 from August 13-17. Contract
+discounts, region, runtime, and model usage affect other subscriptions.
 
 ### Per-student resources (both modes)
 
@@ -330,7 +352,7 @@ All figures below are rough planning estimates based on `westus` list prices. Co
 | Cosmos serverless | Per-request RU | Cents per student at lab volumes |
 | Cosmos provisioned-autoscale (100–1000 RU × 2 containers) | Autoscale floor when idle, scales up under load | About \$9/mo per container at idle floor, up to \$88/mo per container at max. Realistic baseline of roughly \$18/mo per student total since most time is idle |
 | AI Foundry S0 | Per-token | Cents per student per workshop |
-| Storage, Public IP, bandwidth | Per-GB or per-hour | Negligible |
+| Public IP, private endpoints, DNS, bandwidth | Per-hour, per-zone, or per-GB | Included in the measured networking totals above |
 
 ### Fabric — varies by mode
 
@@ -362,9 +384,22 @@ az vm list --query "[?tags.batch=='$batchId'].{rg:resourceGroup, name:name}" -o 
   }
 ```
 
+  **Bastion Developer cannot replace Standard in the current design.** Developer
+  is free, but it is not available in `westus3`, supports only one VM connection
+  at a time, and does not support the shareable links supplied in the student
+  roster. It also cannot be reached by students without Azure Portal access. A
+  larger cost optimization would use one shared Standard Bastion in a hub VNet
+  peered to the student VNets; that requires a separate network topology change.
+
 **Pause the shared Fabric capacity** from the Fabric admin portal when no class is in session. Pausing zeros per-hour billing without losing workspace state.
 
-**Skip Fabric entirely** for batches that don't run Part 3 / Lab 4B: set `deployFabric = false` in [main.bicepparam](../bicep/main.bicepparam) (single-user) or skip `provision-shared-fabric.ps1` and run without `-SharedFabric` (batch).
+**Skip Fabric entirely** for batches that do not run Lab 4B. This is the default.
+Use `-SharedFabric` for cohorts that run Lab 4B, and pause the shared capacity
+outside class hours. Use `-PerStudentFabric` only for isolated validation.
+
+The workshop no longer deploys an unused Storage account, Blob private endpoint,
+or Blob private DNS zone. Based on the measured subscription rates, this removes
+about INR 20.67 per active day from each new environment.
 
 The provisioned Cosmos autoscale is already at the lowest allowed setting (100 RU floor × 2 containers). Deleting the RG between cohorts is the only way to zero those charges.
 

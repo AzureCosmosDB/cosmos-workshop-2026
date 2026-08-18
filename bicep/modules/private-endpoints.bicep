@@ -21,9 +21,6 @@ param cosmosServerlessId string
 @description('Resource ID of the provisioned Cosmos DB account.')
 param cosmosProvisionedId string
 
-@description('Resource ID of the Storage account.')
-param storageAccountId string
-
 @description('Create a private endpoint for Azure AI Foundry.')
 param deployFoundry bool
 
@@ -32,11 +29,6 @@ param foundryAccountId string
 
 resource cosmosDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = if (deployCosmos) {
   name: 'privatelink.documents.azure.com'
-  location: 'global'
-}
-
-resource blobDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
-  name: 'privatelink.blob.${environment().suffixes.storage}'
   location: 'global'
 }
 
@@ -57,16 +49,6 @@ resource aiServicesDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = if (
 
 resource cosmosDnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = if (deployCosmos) {
   parent: cosmosDnsZone
-  name: '${envName}-vnet-link'
-  location: 'global'
-  properties: {
-    registrationEnabled: false
-    virtualNetwork: { id: vnetId }
-  }
-}
-
-resource blobDnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
-  parent: blobDnsZone
   name: '${envName}-vnet-link'
   location: 'global'
   properties: {
@@ -160,36 +142,6 @@ resource cosmosProvisionedDnsGroup 'Microsoft.Network/privateEndpoints/privateDn
       {
         name: 'cosmos-sql'
         properties: { privateDnsZoneId: cosmosDnsZone.id }
-      }
-    ]
-  }
-}
-
-resource storageEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
-  name: '${envName}-storage-blob-pe'
-  location: location
-  properties: {
-    subnet: { id: subnetId }
-    privateLinkServiceConnections: [
-      {
-        name: 'storage-blob'
-        properties: {
-          privateLinkServiceId: storageAccountId
-          groupIds: ['blob']
-        }
-      }
-    ]
-  }
-}
-
-resource storageDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
-  parent: storageEndpoint
-  name: 'default'
-  properties: {
-    privateDnsZoneConfigs: [
-      {
-        name: 'blob'
-        properties: { privateDnsZoneId: blobDnsZone.id }
       }
     ]
   }

@@ -66,9 +66,10 @@ var vmPropertiesBase = {
   additionalCapabilities: {
     hibernationEnabled: false
   }
-  osProfile: union({
+  osProfile: {
     computerName: vmComputerName
     adminUsername: adminUsername
+    adminPassword: adminPassword
     windowsConfiguration: {
       enableAutomaticUpdates: true
       provisionVMAgent: true
@@ -78,7 +79,7 @@ var vmPropertiesBase = {
         enableHotpatching: false
       }
     }
-  }, applyVmSecurityType ? { adminPassword: adminPassword } : {})
+  }
   diagnosticsProfile: {
     bootDiagnostics: {
       enabled: true
@@ -88,7 +89,11 @@ var vmPropertiesBase = {
 
 var vmSecurityProfile = applyVmSecurityType ? {
   securityProfile: {
-    securityType: 'Standard'
+    securityType: 'TrustedLaunch'
+    uefiSettings: {
+      secureBootEnabled: true
+      vTpmEnabled: true
+    }
   }
 } : {}
 var initializerScript = loadTextContent('../../script/Initialize-LabVm.ps1')

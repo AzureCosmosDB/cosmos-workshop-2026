@@ -42,46 +42,30 @@ function Get-BastionShareableLink {
       [System.Text.UTF8Encoding]::new($false)
     )
 
-    $getResponseJson = & az rest --method post --url $getUrl --body "@$requestFile" --only-show-errors 2>$null
-    if ($LASTEXITCODE -eq 0 -and $getResponseJson) {
-      $getResponse = $getResponseJson | ConvertFrom-Json
-      $existingLink = @($getResponse.value) |
-        Where-Object { $_.vm.id -eq $VmId -and $_.bsl } |
-        Select-Object -First 1
-      if ($existingLink) {
-        return [string]$existingLink.bsl
-      }
-    }
-
-    $createResponseJson = & az rest --method post --url $createUrl --body "@$requestFile" --only-show-errors
-    if ($LASTEXITCODE -ne 0) {
-      throw "Failed to create a Bastion shareable link for VM '$VmId'."
-    }
-
-    if ($createResponseJson) {
-      $createResponse = $createResponseJson | ConvertFrom-Json
-      $createdLink = @($createResponse.value) |
-        Where-Object { $_.vm.id -eq $VmId -and $_.bsl } |
-        Select-Object -First 1
-      if ($createdLink) {
-        return [string]$createdLink.bsl
-      }
-    }
-
     for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
-      Start-Sleep -Seconds $DelaySeconds
-      $getResponseJson = & az rest --method post --url $getUrl --body "@$requestFile" --only-show-errors
-      if ($LASTEXITCODE -ne 0) {
-        throw "Failed to retrieve the Bastion shareable link for VM '$VmId'."
+      $getResponseJson = & az rest --method post --url $getUrl --body "@$requestFile" --only-show-errors 2>$null
+      if ($LASTEXITCODE -eq 0 -and $getResponseJson) {
+        $getResponse = $getResponseJson | ConvertFrom-Json
+        $existingLink = @($getResponse.value) |
+          Where-Object { $_.vm.id -eq $VmId -and $_.bsl } |
+          Select-Object -First 1
+        if ($existingLink) {
+          return [string]$existingLink.bsl
+        }
       }
 
-      $getResponse = $getResponseJson | ConvertFrom-Json
-      $createdLink = @($getResponse.value) |
-        Where-Object { $_.vm.id -eq $VmId -and $_.bsl } |
-        Select-Object -First 1
-      if ($createdLink) {
-        return [string]$createdLink.bsl
+      $createResponseJson = & az rest --method post --url $createUrl --body "@$requestFile" --only-show-errors 2>$null
+      if ($LASTEXITCODE -eq 0 -and $createResponseJson) {
+        $createResponse = $createResponseJson | ConvertFrom-Json
+        $createdLink = @($createResponse.value) |
+          Where-Object { $_.vm.id -eq $VmId -and $_.bsl } |
+          Select-Object -First 1
+        if ($createdLink) {
+          return [string]$createdLink.bsl
+        }
       }
+
+      Start-Sleep -Seconds $DelaySeconds
     }
 
     throw "Timed out waiting for the Bastion shareable link for VM '$VmId'."
