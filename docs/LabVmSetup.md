@@ -30,4 +30,4 @@ The VM deployment runs [`script/Initialize-LabVm.ps1`](../script/Initialize-LabV
 - Clone the workshop repository to `Documents\cosmos-workshop-2026`. _(script)_
 - Use PowerShell 7 for the workshop. Git Bash is not required.
 - WSL update popup: press **Enter** to install. (Cancel just re-opens the popup later)
-  - WSL itself is not used by any lab but update keeps it from popping back up.
+  - WSL itself is not used by any lab but update keeps it from popping back up. 
