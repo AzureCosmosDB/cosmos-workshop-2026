@@ -1,6 +1,20 @@
 # Bastion.psm1
 # Purpose: Create and retrieve Azure Bastion shareable links.
 
+function Invoke-AzRestQuiet {
+  # $ErrorActionPreference='Stop' (set by callers) promotes az's stderr/non-zero exit into a
+  # terminating error even with 2>$null, which would break the retry loop below on the first
+  # transient failure (e.g. Bastion/VM not fully ready yet). Temporarily relax it here instead.
+  param([Parameter(Mandatory = $true)][ScriptBlock]$ScriptBlock)
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    & $ScriptBlock 2>$null
+  } finally {
+    $ErrorActionPreference = $prevEap
+  }
+}
+
 function Get-BastionShareableLink {
   [CmdletBinding()]
   [OutputType([string])]
@@ -43,7 +57,7 @@ function Get-BastionShareableLink {
     )
 
     for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
-      $getResponseJson = & az rest --method post --url $getUrl --body "@$requestFile" --only-show-errors 2>$null
+      $getResponseJson = Invoke-AzRestQuiet { az rest --method post --url $getUrl --body "@$requestFile" --only-show-errors }
       if ($LASTEXITCODE -eq 0 -and $getResponseJson) {
         $getResponse = $getResponseJson | ConvertFrom-Json
         $existingLink = @($getResponse.value) |
@@ -54,7 +68,7 @@ function Get-BastionShareableLink {
         }
       }
 
-      $createResponseJson = & az rest --method post --url $createUrl --body "@$requestFile" --only-show-errors 2>$null
+      $createResponseJson = Invoke-AzRestQuiet { az rest --method post --url $createUrl --body "@$requestFile" --only-show-errors }
       if ($LASTEXITCODE -eq 0 -and $createResponseJson) {
         $createResponse = $createResponseJson | ConvertFrom-Json
         $createdLink = @($createResponse.value) |

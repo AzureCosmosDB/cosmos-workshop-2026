@@ -199,4 +199,47 @@ public class Steps_Vector_Search
         }
     }
     #endregion
+
+    #region Step 4
+    public async Task Step4()
+    {
+        if (Container is null) throw new InvalidOperationException("Not initialized. Run Step 0 first.");
+        if (EmbeddingsOpenAIClient is null) throw new InvalidOperationException("EmbeddingsOpenAIClient not initialized. Run Step 0 first.");
+
+        Console.WriteLine("\n=== Step 4: Hybrid Search (STUDENT EXERCISE) ===\n");
+
+        var semanticText = "finding related information based on concepts with predictable capacity";
+        var keywordText = "throughput";
+        var queryVector = await GetEmbedding(semanticText);
+
+        Console.WriteLine($"Semantic query: {semanticText}");
+        Console.WriteLine($"Keyword query:  {keywordText}\n");
+
+        var hybridQuery = new QueryDefinition("""
+            SELECT TOP 3 c.id, c.title, c.text,
+                VectorDistance(c.embedding, @emb) AS vectorDistance
+            FROM c
+            WHERE c.partitionKey = 'docs'
+            ORDER BY RANK RRF(
+                FullTextScore(c.text, @search),
+                VectorDistance(c.embedding, @emb)
+            )
+            """)
+            .WithParameter("@search", keywordText)
+            .WithParameter("@emb", queryVector);
+
+        var hybridResults = await Container.GetItemQueryIterator<Dictionary<string, object>>(hybridQuery)
+            .ReadNextAsync()
+            .ConfigureAwait(false);
+
+        Console.WriteLine("Hybrid search results:");
+        foreach (var result in hybridResults)
+        {
+            Console.WriteLine($"  ID: {result["id"]}");
+            Console.WriteLine($"  Title: {result["title"]}");
+            Console.WriteLine($"  Vector distance: {result.GetValueOrDefault("vectorDistance")}");
+            Console.WriteLine($"  Text: {result["text"]}\n");
+        }
+    }
+    #endregion
 }

@@ -1,0 +1,55 @@
+name: Start Lab VMs
+
+# Second call in the two-call model: provisioning deallocates VMs by default
+# (see deploy-lab.yml / provision-student-environments.ps1), this workflow
+# starts every VM tagged with a given lab identifier for class day.
+on:
+  workflow_dispatch:
+    inputs:
+      lab_id:
+        description: Lab identifier (batch id) to start
+        required: true
+        type: string
+      subscription_id:
+        description: Override subscription ID (blank uses the AZURE_SUBSCRIPTION_ID secret)
+        required: false
+        type: string
+      wait:
+        description: Block until az confirms every VM has started
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: lab-provisioning
+  cancel-in-progress: false
+
+jobs:
+  start:
+    runs-on: windows-latest
+    environment: lab-provisioning
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ inputs.subscription_id || secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Start VMs for the lab
+        shell: pwsh
+        run: |
+          $params = @{
+            LabId = '${{ inputs.lab_id }}'
+            Action = 'Start'
+          }
+          if ('${{ inputs.wait }}' -eq 'true') { $params.Wait = $true }
+
+          ./script/Set-LabVmPowerState.ps1 @params

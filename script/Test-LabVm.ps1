@@ -4,7 +4,10 @@ param(
   [string]$AdminUsername = 'lab_user1',
 
   [Parameter(Mandatory = $false)]
-  [string]$DnsNames = ''
+  [string]$DnsNames = '',
+
+  [Parameter(Mandatory = $false)]
+  [bool]$IsDocDB = $false
 )
 
 $userHome = "C:\Users\$AdminUsername"
@@ -18,6 +21,12 @@ $paths = [ordered]@{
   VSCodeMachine = 'C:\Program Files\Microsoft VS Code\Code.exe'
 }
 
+if ($IsDocDB) {
+  $paths.Node = 'C:\Program Files\nodejs\node.exe'
+  $paths.MongoSh = 'C:\ProgramData\chocolatey\bin\mongosh.exe'
+  $paths.MongoImport = 'C:\ProgramData\chocolatey\bin\mongoimport.exe'
+}
+
 $result = [ordered]@{}
 foreach ($item in $paths.GetEnumerator()) {
   $result[$item.Key] = Test-Path $item.Value
@@ -29,7 +38,15 @@ $result.Repository = Test-Path "$userHome\Documents\cosmos-workshop-2026\.git"
 $setupTask = Get-ScheduledTask -TaskName InitializeLabVm -ErrorAction SilentlyContinue
 $result.SetupTask = if ($setupTask) { $setupTask.State.ToString() } else { 'Not present (completed/self-removed)' }
 
-$result.Extensions = @('ms-toolsai.jupyter', 'ms-dotnettools.csharp', 'ms-python.python') | ForEach-Object {
+$extensions = @('ms-toolsai.jupyter', 'ms-dotnettools.csharp', 'ms-python.python')
+if ($IsDocDB) {
+  $extensions += @(
+    'ms-azuretools.vscode-documentdb',
+    'ms-azurecosmosdbtools.vscode-mongo-migration'
+  )
+}
+
+$result.Extensions = $extensions | ForEach-Object {
   "$_=$(Test-Path "$userHome\.vscode\extensions\$_*")"
 }
 

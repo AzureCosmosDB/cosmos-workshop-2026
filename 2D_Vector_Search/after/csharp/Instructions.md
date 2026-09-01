@@ -1,9 +1,10 @@
 # Lab 2D: Vector Search in C#
 
-**Time**: ~15 min  
+**Time**: ~20 min
+
 **Environment**: .NET 10 terminal
 
-In this exercise you will explore semantic similarity search using Azure Cosmos DB vector capability.
+In this exercise you will compare vector, full-text, and hybrid search using Azure Cosmos DB.
 
 The lab uses a single project in the `2D_Vector_Search` directory. Running `dotnet run` walks through each step in sequence, pausing for **Enter** between steps. Each step builds on the previous one, so you must complete them in order.
 
@@ -60,6 +61,29 @@ var ftsQuery = new QueryDefinition(
 
 **Expected output**: the **Provisioned Throughput** doc — the only one whose `text` literally contains the word `"throughput"`. Contrast this with Step 2: full-text search matches **exact keywords**, while vector search matched by **meaning**.
 
+### Step 4: Hybrid Search (STUDENT EXERCISE)
+
+Replace the placeholder `hybridQuery` in `Steps_Vector_Search.cs` Step 4 with a query that combines full-text relevance and vector similarity using Reciprocal Rank Fusion (`RRF`):
+
+```csharp
+var hybridQuery = new QueryDefinition("""
+    SELECT TOP 3 c.id, c.title, c.text,
+        VectorDistance(c.embedding, @emb) AS vectorDistance
+    FROM c
+    WHERE c.partitionKey = 'docs'
+    ORDER BY RANK RRF(
+        FullTextScore(c.text, @search),
+        VectorDistance(c.embedding, @emb)
+    )
+    """)
+    .WithParameter("@search", keywordText)
+    .WithParameter("@emb", queryVector);
+```
+
+Do not add `FullTextContains` to the `WHERE` clause. Filtering by the keyword first would remove semantic-only candidates before RRF can combine the rankings.
+
+**Expected output**: **Provisioned Throughput** and **Vector Search** rank near the top. The first matches the keyword `throughput`; the second matches the semantic meaning of the query.
+
 ## Lab Complete!
 
 You have completed the vector search exercise in C#. You:
@@ -68,5 +92,6 @@ You have completed the vector search exercise in C#. You:
 - Stored vectorized documents in Cosmos DB
 - Performed vector similarity search
 - Performed full-text search
+- Combined vector and full-text rankings with RRF hybrid search
 
 To run the lab again from scratch, run `dotnet run` again to walk through every step in sequence.

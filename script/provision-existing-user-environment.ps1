@@ -326,6 +326,8 @@ if (-not $IsDocDB -and -not $NoFabric) {
 
 $row = [ordered]@{
   UserPrincipalName        = $UserPrincipalName
+  TempPassword             = ''
+  BastionUri               = $bastionUri
   ObjectId                 = $studentObjectId
   ResourceGroup            = $ResourceGroupName
   VmName                   = $outputs.vmName.value
@@ -333,9 +335,8 @@ $row = [ordered]@{
   VmPublicIp               = $outputs.vmPublicIpAddress.value
   VmPublicFqdn             = $outputs.vmPublicIp.value
   BastionName              = $outputs.bastionName.value
-  BastionUri               = $bastionUri
   VmAdminUsername          = $VmAdminUsername
-  VmAdminPassword          = $vmAdminPassword
+  VmAdminPassword          = ''
   CosmosServerlessAccount  = $outputs.cosmosAccountName.value
   CosmosProvisionedAccount = $outputs.cosmosProvisionedAccountName.value
   DocumentDbCluster        = $outputs.documentDbClusterName.value

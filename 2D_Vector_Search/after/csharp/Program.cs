@@ -21,3 +21,8 @@ await Console.In.ReadLineAsync();
 
 Console.WriteLine("\n========== STEP 3: Full-text search ==========");
 await steps.Step3();
+Console.WriteLine("\n--- Press Enter to continue to Step 4 ---");
+await Console.In.ReadLineAsync();
+
+Console.WriteLine("\n========== STEP 4: Hybrid search ==========");
+await steps.Step4();

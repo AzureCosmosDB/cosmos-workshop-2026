@@ -38,7 +38,7 @@ resource cluster 'Microsoft.DocumentDB/mongoClusters@2025-09-01' = {
       targetMode: 'Disabled'
     }
     compute: {
-      tier: 'M10'
+      tier: 'M30'
     }
   }
 }

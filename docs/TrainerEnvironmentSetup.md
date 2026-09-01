@@ -7,13 +7,14 @@
 3. [Prerequisites](#environment-setup-prerequisites)
 4. [Shared Fabric setup (batch mode, one-time)](#shared-fabric-setup-batch-mode-one-time)
 5. [Running the provisioning script](#running-the-provisioning-script)
-6. [Configuring per-student Fabric workspaces (batch mode)](#configuring-per-student-fabric-workspaces-batch-mode)
-7. [Expected results](#expected-results)
-8. [Handing out credentials](#handing-out-credentials)
-9. [Smoke-testing one student environment](#smoke-testing-one-student-environment)
-10. [Troubleshooting](#troubleshooting)
-11. [Cost considerations](#cost-considerations)
-12. [Cleanup](#cleanup)
+6. [Automated Deployment via GitHub Actions](#automated-deployment-via-github-actions)
+7. [Configuring per-student Fabric workspaces (batch mode)](#configuring-per-student-fabric-workspaces-batch-mode)
+8. [Expected results](#expected-results)
+9. [Handing out credentials](#handing-out-credentials)
+10. [Smoke-testing one student environment](#smoke-testing-one-student-environment)
+11. [Troubleshooting](#troubleshooting)
+12. [Cost considerations](#cost-considerations)
+13. [Cleanup](#cleanup)
 
 ---
 
@@ -40,7 +41,7 @@ Fabric is disabled by default. Use `-SharedFabric` for a cohort or
 
 For each student, the script creates:
 
-- **One Entra ID user**: `lab_user{N}_{batchId}@<tenant-default-domain>`, display name `{MMdd-HHmm} Lab User {N}` (the batch-time prefix groups all students from one class together when the Entra users blade is sorted by display name), with one randomly generated password shared by the portal and VM accounts. Password change at next sign-in is disabled so both credentials remain aligned.
+- **One Entra ID user**: `lab_user{N}_{batchId}@<tenant-default-domain>`, display name `{MMdd-HHmm} Lab User {N}` (the batch-time prefix groups all students from one class together when the Entra users blade is sorted by display name), with one randomly generated password used for Windows and Azure access. Password change at next sign-in is disabled.
 - **One resource group**: `lab-dev{N}-{batchId}`, with the student granted **Owner** on that RG only (via [main.resources.bicep](../bicep/main.resources.bicep) `studentOwnerAssignment`). The student is also pre-granted **Cognitive Services Contributor** and **Cognitive Services OpenAI Contributor** on the Foundry account as a backstop against silent failures of the Lab 1B role grant — Owner alone does not include the OpenAI data actions, and the two-role pairing covers historical drift in which actions each role includes.
 - **All workshop resources inside that RG**, deployed by [main.bicep](../bicep/main.bicep):
   - Cosmos DB serverless account (`cosmosl{N}<unique>`)
@@ -49,10 +50,9 @@ For each student, the script creates:
   - Microsoft Fabric capacity, **F2 SKU per student** only with `-PerStudentFabric`. See [Cost considerations](#cost-considerations)
   - Lab VM (`Standard_D4ds_v7` by default, Windows, computer name `cosmos-lab{N}`) on a private VNet
   - Azure Bastion Standard with shareable links, a dedicated public IP, and `AzureBastionSubnet` for browser-based VM access without Azure Portal authentication
-- **A roster CSV** at `out/students-{batchId}.csv` containing UPN, temp password, RG name, VM FQDN, VM admin user/password, and all account names.
+- **A roster CSV** at `out/students-{batchId}.csv` containing UPN, student password, Bastion URI, RG name, VM details, and all account names. The bootstrap VM password is never included.
 
 Student number is used across multiple resources for easy visual confirmation, for example:
-- VM admin user `lab_user{N}`
 - Entra user `lab_user{N}_{batchId}@tenant`
 - Resource group `lab-dev{N}-{batchId}`
 
@@ -96,25 +96,34 @@ F2 is the smallest paid Fabric SKU and is sufficient for the small mirror + T-SQ
 
 ## Running the provisioning script
 
+Provisioning is a two-call model: this script creates the environments and leaves every VM deallocated (not billed for compute) by default, then [Set-LabVmPowerState.ps1](../script/Set-LabVmPowerState.ps1) starts them for class day.
+
 ```powershell
 az login
 az account set --subscription "<workshop-subscription-id-or-name>"
 
-# Single-user test (Fabric omitted)
+# Single-user test (Fabric omitted), lab id auto-generated
 ./script/provision-student-environments.ps1 -StudentCount 1
 
 # Isolated Lab 4B validation (per-student F2)
 ./script/provision-student-environments.ps1 -StudentCount 1 -PerStudentFabric
 
-# Batch (per-student Fabric skipped; assumes shared capacity is already deployed)
-./script/provision-student-environments.ps1 -StudentCount 12 -SharedFabric
+# Batch (per-student Fabric skipped; assumes shared capacity is already deployed),
+# with a trainer-chosen lab identifier instead of the auto-generated one
+./script/provision-student-environments.ps1 -StudentCount 12 -SharedFabric -LabId cohort-sept-2026
+
+# On class day: start every VM tagged with that lab identifier
+./script/Set-LabVmPowerState.ps1 -LabId cohort-sept-2026 -Action Start
 ```
+
+If you provision more students later for the same class, pass the same `-LabId` value again. New students join the same batch (same roster file, same `batch` tag), and `Set-LabVmPowerState.ps1` picks up everyone tagged with that lab identifier, not just the most recent run.
 
 ### Parameters
 
 | Param | Default | Notes |
 |---|---|---|
 | `-StudentCount` | required | 1–999 |
+| `-LabId` | auto-generated timestamp | Optional trainer-chosen identifier (letters, digits, hyphens). Reuse it across runs to add students to the same class batch; omit it to let the script generate one |
 | `-SubscriptionId` | current `az` sub | Override to avoid relying on `az account` context |
 | `-TenantDomain` | from `az account show --query tenantDefaultDomain` | Override if discovery fails or a custom verified domain is needed |
 | `-Location` | `westus` | All current resource types are verified to deploy there |
@@ -126,6 +135,24 @@ az account set --subscription "<workshop-subscription-id-or-name>"
 | `-SharedFabricResourceGroup` | `lab-shared-fabric` | Override only if `provision-shared-fabric.ps1` used a non-default RG name |
 | `-SharedFabricCapacityName` | `fabricworkshopshared` | Override only if `provision-shared-fabric.ps1` used a non-default capacity name |
 | `-MaxParallelDeployments` | `5` | Number of student ARM deployments started concurrently; reduce if the subscription reaches regional quota or API throttling limits |
+| `-SkipDeallocate` | off | Leaves VMs running after deployment instead of deallocating them; use for a quick single-user test you want to log into immediately |
+
+### Starting and stopping VMs by lab identifier
+
+[Set-LabVmPowerState.ps1](../script/Set-LabVmPowerState.ps1) finds every VM tagged `batch=<LabId>` and starts or deallocates them as a group.
+
+```powershell
+# Start every VM in a batch for class
+./script/Set-LabVmPowerState.ps1 -LabId cohort-sept-2026 -Action Start
+
+# Deallocate them again after class to stop billing
+./script/Set-LabVmPowerState.ps1 -LabId cohort-sept-2026 -Action Deallocate
+
+# Block until az confirms every VM reached the requested state
+./script/Set-LabVmPowerState.ps1 -LabId cohort-sept-2026 -Action Start -Wait
+```
+
+The script throws if no VMs match the given `-LabId`, which usually means the identifier does not match what was passed to (or generated by) `provision-student-environments.ps1`. Check the roster CSV's `BatchId` column or the printed "Lab ID (batch)" line from that run if you are unsure.
 
 ### What the script does, in order
 
@@ -142,6 +169,34 @@ az account set --subscription "<workshop-subscription-id-or-name>"
    7. Calls [Set-CosmosMirroringRbac.ps1](../script/Set-CosmosMirroringRbac.ps1) (a transliteration of the Microsoft-published [rbac-cosmos-mirror.sh](https://github.com/Azure-Samples/azure-cli-samples/blob/master/cosmosdb/common/rbac-cosmos-mirror.sh) bash sample) to grant the student a custom Cosmos role (`readMetadata` + `readAnalytics`) on the serverless account. Required for Lab 4B to configure Fabric mirroring via Entra ID auth. Uses `az` CLI — no extra auth context needed. Failures here are non-fatal — the script warns, records the student, and continues; a summary is printed at the end so you can re-run the helper manually.
 
 Each batch is timestamped (`yyyyMMddHHmm`); re-runs produce a new `batchId` and never collide. Mid-loop failures leave orphan Entra users and RGs for the in-progress student only — see [Mid-run failure recovery](#mid-run-failure-recovery).
+
+---
+
+## Automated Deployment via GitHub Actions
+
+Two workflows mirror the two-call model: [deploy-lab.yml](../.github/workflows/deploy-lab.yml) creates the environments with VMs deallocated, and [start-lab-vms.yml](../.github/workflows/start-lab-vms.yml) starts them for a given lab identifier when class day arrives.
+
+### One-time setup
+
+1. Register a Microsoft Entra app (or reuse one) and add a federated credential trusting this repository for GitHub Actions OIDC.
+2. Grant that app's service principal, at the subscription scope: **Contributor**, **User Access Administrator**, and the Microsoft Graph **User.ReadWrite.All** application permission (or an equivalent **User Administrator** directory role) so it can create Entra users the same way an interactive trainer sign-in does.
+3. In the repository, create a `lab-provisioning` environment and add these secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`. Consider adding required reviewers on this environment since both workflows create or start billable resources.
+4. Set these repository variables for the scheduled path: `CLASS_DATE` (the class date, `yyyy-MM-dd`, set per cohort), and optionally `DEFAULT_STUDENT_COUNT`, `DEFAULT_FABRIC_MODE` (`none`, `shared`, or `per-student`), `DEFAULT_LOCATION`, `DEFAULT_TENANT_DOMAIN`.
+
+### Deploying (deploy-lab.yml)
+
+* On demand: trigger the workflow manually and set the student count, Fabric mode, location, and optional `lab_id`. Leave `lab_id` blank to let the script generate one, or set it to reuse an existing batch.
+* Scheduled: the workflow runs daily and only proceeds when tomorrow's date matches `vars.CLASS_DATE`, so provisioning fires automatically about a day ahead of class without adjusting the cron expression each cohort.
+* The run's log and job summary print the effective lab identifier (`::notice::Lab ID for this batch is ...`), whether generated or reused. Use it with the start workflow below.
+* VMs are deallocated as soon as each deployment finishes, so the environments are ready but not billed for compute until started.
+
+### Starting VMs for class (start-lab-vms.yml)
+
+Trigger this workflow manually with the `lab_id` from the deploy run (or any lab identifier you provisioned with `-LabId`). It starts every VM tagged with that batch, regardless of which deploy run created them, so multiple provisioning runs against the same `lab_id` are started together.
+
+### Handling the roster
+
+The roster CSV is uploaded as a workflow artifact named `student-roster-<run-id>` with a 3-day retention window. It contains temporary passwords, so download it over an authenticated GitHub session, distribute credentials over a secure channel, and delete the artifact once handed out.
 
 ---
 
@@ -211,7 +266,7 @@ After a successful run, each `lab-dev{N}-{batchId}` resource group should contai
 | Fabric capacity | `fabricl{N}<unique>` | Created only with `-PerStudentFabric`. Omitted by default and under `-SharedFabric` |
 | VNet / Subnet / NSG / PIP / NIC | per VM | Networking for the lab VM |
 | Azure Bastion | `l{N}-bastion` | Standard SKU with a tokenized shareable link for browser-based VM access |
-| VM | `lab-vm-l{N}-01` | Windows, `Standard_D4ds_v7`, computer name `cosmos-lab{N}`, admin `lab_user{N}` |
+| VM | `lab-vm-l{N}-01` | Windows, `Standard_D4ds_v7`, computer name `cosmos-lab{N}`, Entra sign-in enabled |
 
 The `<unique>` suffix is a deterministic hash of the RG resource ID — same RG name yields the same suffix on re-deploys.
 
@@ -219,27 +274,32 @@ The `<unique>` suffix is a deterministic hash of the RG resource ID — same RG 
 
 `out/students-{batchId}.csv` is the single artifact for credential distribution. Columns:
 
-`Student, UserPrincipalName, TempPassword, ObjectId, ResourceGroup, VmName, VmComputerName, VmPublicIp, VmPublicFqdn, BastionName, BastionUri, VmAdminUsername, VmAdminPassword, CosmosServerlessAccount, CosmosProvisionedAccount, DocumentDbCluster, FoundryAccount, StorageAccount, EnvName, BatchId`
+`UserPrincipalName, TempPassword, BastionUri, Student, ObjectId, ResourceGroup, VmName, VmComputerName, VmPublicIp, VmPublicFqdn, BastionName, VmAdminUsername, VmAdminPassword, CosmosServerlessAccount, CosmosProvisionedAccount, DocumentDbCluster, FoundryAccount, StorageAccount, EnvName, BatchId`
 
 Batch mode appends: `FabricSharedCapacityId, FabricSharedCapacityName, FabricWorkspaceId, FabricWorkspaceName`. The last two are blank after `provision-student-environments.ps1` and are populated by `configure-student-fabric.ps1`.
 
-> **CSV includes secrets.** `TempPassword` and `VmAdminPassword` contain the same password. Distribute the roster over a secure channel.
+> **CSV includes secrets.** `TempPassword` is the student password for both Windows and Azure access. `VmAdminPassword` is blank and retained only for CSV compatibility. Distribute the roster over a secure channel.
 
 ---
 
 ## Handing out credentials
 
+Provisioning leaves VMs deallocated by default. Start them before handing out credentials, or students will not be able to connect through Bastion:
+
+```powershell
+./script/Set-LabVmPowerState.ps1 -LabId <lab-id-from-provisioning> -Action Start -Wait
+```
+
 Each student needs these values to start:
 
 1. Their `BastionUri`, a tokenized shareable link that opens the VM connection page without an Azure Portal sign-in
-2. VM login — `VmAdminUsername` + `VmAdminPassword`
-3. Entra login (used inside the VM for Azure services) — `UserPrincipalName` + `TempPassword`
-4. A pointer to [docs/StudentEnvironmentSetup.md](StudentEnvironmentSetup.md)
+2. Windows and Entra login — `UserPrincipalName` + `TempPassword`
+3. A pointer to [docs/StudentEnvironmentSetup.md](StudentEnvironmentSetup.md)
 
-The Entra and VM accounts use the same generated password. Password change at
-first sign-in is disabled so the credentials remain aligned. Tenant policy can
-still require additional authentication enrollment when students run `az login`
-or open Azure Portal.
+The Entra account is used for both Windows and Azure access. The local VM
+administrator is bootstrap-only and is not distributed. Password change at first
+sign-in is disabled. Tenant policy can still require additional authentication
+enrollment when students run `az login` or open Azure Portal.
 
 ---
 
@@ -247,12 +307,21 @@ or open Azure Portal.
 
 Before class, log in as one student end-to-end. Catches RBAC propagation lag, model deployment failures, and NSG issues that deployment success hides.
 
-1. Open the student's `BastionUri` in a private browser window without signing in to Azure Portal. Use `lab_user{N}` and the VM admin password.
+Start that student's VM first if you provisioned with the default deallocate-after-create behavior:
+
+```powershell
+./script/Set-LabVmPowerState.ps1 -LabId <lab-id-from-provisioning> -Action Start -Wait
+```
+
+1. Open the student's `BastionUri` in a private browser window without signing in to Azure Portal. Use the student's `UserPrincipalName` and `TempPassword`.
 2. Open PowerShell 7 on the VM. Run:
    ```powershell
-   az login
+  az login --use-device-code
    ```
-   Sign in as `lab_user{N}_{batchId}@<tenant>`. Change the password when prompted.
+  Open <https://microsoft.com/devicelogin> in the visible browser window, enter
+  the displayed code, and sign in as `lab_user{N}_{batchId}@<tenant>` with the
+  shared password. Password change at first sign-in is disabled. Windows sign-in
+  uses the Entra account; the local bootstrap account is not distributed.
 3. Change to the workshop repository cloned during VM initialization, then:
    ```powershell
   cd "$HOME\Documents\cosmos-workshop-2026"
@@ -319,7 +388,7 @@ The script is idempotent — re-run for the same roster to retry failed rows. Su
 
 ### Bicep param drift
 
-The provisioning script overrides: `envName`, `location`, `resourceGroupName`, `vmAdminUsername`, `vmAdminPassword`, `vmComputerName`, `applyVmSecurityType=true`, `studentOwnerObjectId`, `tags`, and `deployFabric`. Everything else comes from [main.bicepparam](../bicep/main.bicepparam). Edit the parameter file to change SKUs or model names.
+The provisioning script overrides: `envName`, `location`, `resourceGroupName`, `vmAdminUsername`, `vmAdminPassword`, `vmComputerName`, `applyVmSecurityType=true`, `studentOwnerObjectId`, `tags`, and `deployFabric`. Everything else comes from [main.bicepparam](../bicep/main.bicepparam). Edit the parameter file to change SKUs or model names. The VM admin parameters are bootstrap-only and are not student credentials.
 
 ---
 
@@ -362,23 +431,14 @@ In batch mode Fabric is a fixed cost rather than scaling with the cohort — a 1
 
 ### Cost reduction
 
-**Stop and deallocate VMs outside class hours.** A deallocated VM bills nothing for compute and disk storage cost is minimal.
+**Stop and deallocate VMs outside class hours.** A deallocated VM bills nothing for compute and disk storage cost is minimal. Provisioning already deallocates VMs by default (see [Running the provisioning script](#running-the-provisioning-script)), so this only matters for VMs you started for a class that has since ended.
 
 ```powershell
-# Deallocate all student VMs for a batch
-$batchId = '202606201430'
-az vm list --query "[?tags.batch=='$batchId'].{rg:resourceGroup, name:name}" -o tsv |
-  ForEach-Object {
-    $parts = $_ -split "`t"
-    az vm deallocate --resource-group $parts[0] --name $parts[1] --no-wait
-  }
+# Deallocate all VMs for a batch after class
+./script/Set-LabVmPowerState.ps1 -LabId cohort-sept-2026 -Action Deallocate
 
-# Restart before class
-az vm list --query "[?tags.batch=='$batchId'].{rg:resourceGroup, name:name}" -o tsv |
-  ForEach-Object {
-    $parts = $_ -split "`t"
-    az vm start --resource-group $parts[0] --name $parts[1] --no-wait
-  }
+# Start them again before the next session
+./script/Set-LabVmPowerState.ps1 -LabId cohort-sept-2026 -Action Start
 ```
 
   **Bastion Developer cannot replace Standard in the current design.** Developer

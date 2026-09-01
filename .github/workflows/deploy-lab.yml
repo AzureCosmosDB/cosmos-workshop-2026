@@ -1,0 +1,164 @@
+name: Deploy Lab Environments
+
+# Manual trigger for on-demand provisioning, plus a daily schedule that only
+# proceeds when tomorrow matches the vars.CLASS_DATE repository variable.
+# This lets a trainer set CLASS_DATE once per cohort and have provisioning
+# fire automatically ~24 hours ahead, matching the guidance in
+# docs/TrainerEnvironmentSetup.md to provision at least a day before class.
+on:
+  workflow_dispatch:
+    inputs:
+      lab_id:
+        description: Lab identifier to associate with this batch (blank generates a fresh one)
+        required: false
+        type: string
+      student_count:
+        description: Number of student environments to provision
+        required: true
+        type: number
+        default: 1
+      fabric_mode:
+        description: Fabric handling for this run
+        required: true
+        type: choice
+        options:
+          - none
+          - shared
+          - per-student
+        default: shared
+      location:
+        description: Azure region for the deployment
+        required: false
+        type: string
+        default: westus
+      subscription_id:
+        description: Override subscription ID (blank uses the AZURE_SUBSCRIPTION_ID secret)
+        required: false
+        type: string
+      tenant_domain:
+        description: Override tenant default domain (blank auto-discovers it)
+        required: false
+        type: string
+      max_parallel_deployments:
+        description: Number of student deployments to run concurrently
+        required: false
+        type: number
+        default: 5
+  schedule:
+    - cron: "0 13 * * *"
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: lab-provisioning
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+    steps:
+      - name: Decide whether a scheduled run should proceed
+        id: check
+        shell: pwsh
+        run: |
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            "should_run=true" >> $env:GITHUB_OUTPUT
+            return
+          }
+
+          $classDate = '${{ vars.CLASS_DATE }}'
+          if (-not $classDate) {
+            Write-Output "No vars.CLASS_DATE set. Skipping scheduled run."
+            "should_run=false" >> $env:GITHUB_OUTPUT
+            return
+          }
+
+          $tomorrow = (Get-Date).ToUniversalTime().Date.AddDays(1).ToString('yyyy-MM-dd')
+          if ($tomorrow -eq $classDate) {
+            Write-Output "Tomorrow ($tomorrow) matches CLASS_DATE. Proceeding."
+            "should_run=true" >> $env:GITHUB_OUTPUT
+          } else {
+            Write-Output "Tomorrow ($tomorrow) does not match CLASS_DATE ($classDate). Skipping."
+            "should_run=false" >> $env:GITHUB_OUTPUT
+          }
+
+  provision:
+    needs: guard
+    if: needs.guard.outputs.should_run == 'true'
+    runs-on: windows-latest
+    environment: lab-provisioning
+    env:
+      LAB_ID: ${{ inputs.lab_id }}
+      STUDENT_COUNT: ${{ inputs.student_count || vars.DEFAULT_STUDENT_COUNT }}
+      FABRIC_MODE: ${{ inputs.fabric_mode || vars.DEFAULT_FABRIC_MODE || 'shared' }}
+      LOCATION: ${{ inputs.location || vars.DEFAULT_LOCATION || 'westus' }}
+      TENANT_DOMAIN: ${{ inputs.tenant_domain || vars.DEFAULT_TENANT_DOMAIN }}
+      MAX_PARALLEL: ${{ inputs.max_parallel_deployments || 5 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ inputs.subscription_id || secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Ensure bicep CLI is available
+        shell: pwsh
+        run: az bicep upgrade
+
+      - name: Provision shared Fabric capacity
+        if: env.FABRIC_MODE == 'shared'
+        shell: pwsh
+        run: |
+          ./script/provision-shared-fabric.ps1 -Location $env:LOCATION
+
+      - name: Provision student environments
+        id: provision_students
+        shell: pwsh
+        run: |
+          $params = @{
+            StudentCount = [int]$env:STUDENT_COUNT
+            Location = $env:LOCATION
+            MaxParallelDeployments = [int]$env:MAX_PARALLEL
+          }
+          if ($env:LAB_ID) { $params.LabId = $env:LAB_ID }
+          if ($env:TENANT_DOMAIN) { $params.TenantDomain = $env:TENANT_DOMAIN }
+          switch ($env:FABRIC_MODE) {
+            'shared' { $params.SharedFabric = $true }
+            'per-student' { $params.PerStudentFabric = $true }
+            default { $params.NoFabric = $true }
+          }
+
+          ./script/provision-student-environments.ps1 @params
+
+          $roster = Get-ChildItem -Path ./out -Filter 'students-*.csv' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $roster) { throw 'No roster CSV was produced by provisioning.' }
+          "roster_path=$($roster.FullName)" >> $env:GITHUB_OUTPUT
+          $labId = ($roster.BaseName -replace '^students-', '')
+          "lab_id=$labId" >> $env:GITHUB_OUTPUT
+          Write-Output "::notice::Lab ID for this batch is $labId. Start its VMs later with Set-LabVmPowerState.ps1 -LabId $labId -Action Start."
+
+      - name: Configure per-student Fabric workspaces
+        if: env.FABRIC_MODE == 'shared'
+        shell: pwsh
+        run: |
+          ./script/configure-student-fabric.ps1 -RosterCsv '${{ steps.provision_students.outputs.roster_path }}'
+
+      - name: Upload roster as a secured artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-roster-${{ github.run_id }}
+          path: ${{ steps.provision_students.outputs.roster_path }}
+          retention-days: 3
+
+      - name: Roster contains secrets warning
+        shell: pwsh
+        run: |
+          Write-Output "::warning::The uploaded roster CSV contains temporary passwords. Distribute it over a secure channel and delete the artifact once credentials are handed out."

@@ -25,6 +25,9 @@ param modelName string
 @description('Chat model version')
 param modelVersion string
 
+@description('Chat model deployment capacity in thousands of tokens per minute')
+param modelCapacity int
+
 @description('Chat model deployment SKU (GlobalStandard is required for newer models that no longer offer regional Standard)')
 param modelSkuName string = 'GlobalStandard'
 
@@ -80,7 +83,7 @@ resource chatModelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2
   name: deploymentName
   sku: {
     name: modelSkuName
-    capacity: 1
+    capacity: modelCapacity
   }
   properties: {
     model: {

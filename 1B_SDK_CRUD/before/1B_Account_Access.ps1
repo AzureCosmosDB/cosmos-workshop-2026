@@ -29,10 +29,12 @@ Write-Output "Resource group:         $RESOURCE_GROUP"
 # ---- Discover account names from the resource group ----
 $cosmosAccounts = @(az cosmosdb list -g $RESOURCE_GROUP -o json | ConvertFrom-Json)
 $serverless = $cosmosAccounts | Where-Object {
-  ($_.capabilities | Where-Object { $_.name -eq 'EnableServerless' })
+  ($_.capabilities | Where-Object {
+    ($_ -is [string] -and $_ -eq 'EnableServerless') -or $_.name -eq 'EnableServerless'
+  }) -or $_.name -notlike 'cosmos-provisioned-*'
 } | Select-Object -First 1
 $provisioned = $cosmosAccounts | Where-Object {
-  -not ($_.capabilities | Where-Object { $_.name -eq 'EnableServerless' })
+  $_.name -like 'cosmos-provisioned-*'
 } | Select-Object -First 1
 
 if (-not $serverless)  { Write-Error "No serverless Cosmos account found in $RESOURCE_GROUP."; exit 1 }

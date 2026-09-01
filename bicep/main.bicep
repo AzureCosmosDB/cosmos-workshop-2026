@@ -65,6 +65,9 @@ param foundryModelName string
 @description('Azure AI Foundry chat model version')
 param foundryModelVersion string
 
+@description('Azure AI Foundry chat model deployment capacity in thousands of tokens per minute')
+param foundryModelCapacity int = 10
+
 @description('Azure AI Foundry embedding model deployment name')
 param foundryEmbeddingDeploymentName string
 
@@ -120,6 +123,7 @@ module lab './main.resources.bicep' = {
     foundryDeploymentName: foundryDeploymentName
     foundryModelName: foundryModelName
     foundryModelVersion: foundryModelVersion
+    foundryModelCapacity: foundryModelCapacity
     foundryEmbeddingDeploymentName: foundryEmbeddingDeploymentName
     foundryEmbeddingModelName: foundryEmbeddingModelName
     foundryEmbeddingModelVersion: foundryEmbeddingModelVersion

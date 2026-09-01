@@ -21,13 +21,14 @@ covered in [Trainer Environment Setup](TrainerEnvironmentSetup.md).
 2. Use shared Fabric for a cohort that includes Lab 4B. Do not deploy one Fabric
   capacity per student.
 3. Retain the generated roster in a secure location.
-4. Confirm that each student has one shared portal and VM password.
+4. Confirm that each student has one Entra password for Windows and Azure access.
 
 ### Step 3: Validate one student environment
 
 1. Use one roster row exactly as a student would.
 2. Open its Bastion link and sign in to the VM.
-3. Run `az login`, `SetEnv.ps1`, and `1B_Account_Access.ps1`.
+3. Run `az login --use-device-code`, `SetEnv.ps1`, and
+  `1B_Account_Access.ps1`.
 4. Run the smoke test documented in
   [Trainer Environment Setup](TrainerEnvironmentSetup.md#smoke-testing-one-student-environment).
 5. Validate Fabric separately when Lab 4B is included.
@@ -114,8 +115,8 @@ Provision the cohort at least 24 hours before class using [TrainerEnvironmentSet
 ## Student setup
 
 Student VM, account setup, language selection, and lab sequencing are in
-[StudentEnvironmentSetup.md](StudentEnvironmentSetup.md). The portal and VM use
-the same password, and password change at first sign-in is disabled. Tenant
+[StudentEnvironmentSetup.md](StudentEnvironmentSetup.md). The Entra password is
+used for both Windows and Azure, and password change at first sign-in is disabled. Tenant
 policy can still require additional authentication enrollment, so allow setup
 time for the slowest students.
 
@@ -232,15 +233,16 @@ time for the slowest students.
   - **404 on chat completion:** `COMPLETIONS_MODEL` doesn't match the deployment name in Foundry. Verify in ai.azure.com -> Deployments.
   - **Rate limit (429):** Per-student Foundry capacity is small. If a student's cell bursts, expect occasional throttling — re-run usually clears it.
 
-#### 2D: Vector Search (Lab, 15 min)
+#### 2D: Vector, Full-Text, and Hybrid Search (Lab, 20 min)
 
 - **Files:** [2D_Vector_Search/](../2D_Vector_Search/)
-- **Pre-flight:** Uses the `WorkshopData.Docs` container — confirm vector embedding policy and DiskANN index are in place.
-- **Key points:** generate embeddings -> store with the document -> query with `VectorDistance(...)`; compare against `FullTextContains(...)` to motivate semantic vs keyword.
-- **Demo hook:** After running the vector query, swap the search phrase to something the keyword search would miss (e.g., "how reliable is Cosmos" vs full-text on `cosmos db`). The semantic hit lands as a visceral "ahh".
+- **Pre-flight:** Uses the `WorkshopData.Docs` container. Confirm the vector embedding policy, DiskANN index, and full-text index are in place.
+- **Key points:** compare `VectorDistance(...)` with `FullTextContains(...)`, then combine semantic and lexical rankings with `ORDER BY RANK RRF(...)`.
+- **Demo hook:** Show how the hybrid query keeps both the exact keyword match and the semantic match near the top. Remove either scoring function from `RRF` to show how each signal changes the ranking.
 - **Common questions:**
   - *"Why TOP N with ORDER BY VectorDistance?"* That's how nearest-neighbor is expressed — there's no dedicated `VECTOR_SEARCH` syntax.
   - *"Cosine vs dot product?"* Embeddings are normalized, so cosine and dot give the same ranking. We use cosine.
+  - *"Why not filter with FullTextContains in the hybrid query?"* That would remove semantic-only candidates before RRF merges the ranked lists.
 
 #### 2A (part 2): RAG, Security and Governance, Observability and Guardrails, Models and Pricing (Deck, 15 min)
 

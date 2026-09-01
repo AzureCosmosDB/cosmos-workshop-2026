@@ -13,6 +13,9 @@ param(
   [string]$SetupTaskName,
 
   [Parameter(Mandatory = $false)]
+  [int]$IsDocDB = 0,
+
+  [Parameter(Mandatory = $false)]
   [ValidateSet('All', 'Machine', 'User')]
   [string]$SetupPhase = 'All'
 )
@@ -61,6 +64,12 @@ if ($SetupPhase -in @('All', 'Machine')) {
   Invoke-Chocolatey -Package 'dotnet-10.0-sdk'
   Invoke-Chocolatey -Package 'python314'
   Invoke-Chocolatey -Package 'vscode'
+
+  if ($IsDocDB) {
+    Invoke-Chocolatey -Package 'nodejs-lts'
+    Invoke-Chocolatey -Package 'mongodb-shell'
+    Invoke-Chocolatey -Package 'mongodb-database-tools'
+  }
 }
 
 if ($SetupPhase -eq 'Machine') {
@@ -117,7 +126,15 @@ if (-not $code) {
 }
 else {
   $extensionsPath = Join-Path $UserHomePath '.vscode\extensions'
-  foreach ($ext in @('ms-toolsai.jupyter', 'ms-dotnettools.csharp', 'ms-python.python')) {
+  $extensions = @('ms-toolsai.jupyter', 'ms-dotnettools.csharp', 'ms-python.python')
+  if ($IsDocDB) {
+    $extensions += @(
+      'ms-azuretools.vscode-documentdb',
+      'ms-azurecosmosdbtools.vscode-mongo-migration'
+    )
+  }
+
+  foreach ($ext in $extensions) {
     Write-Host "==> code --install-extension $ext" -ForegroundColor Cyan
     & $code --extensions-dir $extensionsPath --install-extension $ext --force
     if ($LASTEXITCODE -ne 0) { throw "Failed to install VS Code extension '$ext'." }
@@ -128,7 +145,7 @@ Write-Host ""
 Write-Host "Lab VM setup complete." -ForegroundColor Green
 Write-Host "Workshop repository: $RepositoryPath"
 Write-Host "Remaining manual steps (cannot be automated reliably):" -ForegroundColor Yellow
-Write-Host "  - Open PowerShell 7, then run: az login"
+Write-Host "  - Open PowerShell 7, then run: az login --use-device-code"
 Write-Host "  - Change to $RepositoryPath and run: ./SetEnv.ps1"
 Write-Host "  - Dismiss the VS Code 'Sign in to GitHub' prompt (students use Azure accounts)."
 Write-Host "  - If a WSL update popup appears, press Enter to install."

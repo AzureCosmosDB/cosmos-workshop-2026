@@ -24,6 +24,11 @@ param adminUsername string
 @secure()
 param adminPassword string
 
+@description('Entra object ID to grant Windows VM sign-in access.')
+param entraLoginObjectId string
+
+var vmUserLoginRoleDefinitionId = 'fb879cbe-42f0-422f-9e78-4cbd5e659c3e'
+
 @description('NIC resource ID to attach to the VM')
 param nicId string
 
@@ -33,7 +38,13 @@ param tags object
 @description('Set to true when creating a VM so securityType is stamped; set false for no-op reruns to avoid immutable property updates')
 param applyVmSecurityType bool = true
 
+@description('Install Azure DocumentDB extensions and MongoDB command-line tools')
+param isDocDB bool = false
+
 var vmPropertiesBase = {
+  identity: {
+    type: 'SystemAssigned'
+  }
   hardwareProfile: {
     vmSize: vmSize
   }
@@ -105,29 +116,50 @@ resource virtualMachine 'Microsoft.Compute/virtualMachines@2024-11-01' = {
   properties: union(vmPropertiesBase, vmSecurityProfile)
 }
 
+resource entraLoginExtension 'Microsoft.Compute/virtualMachines/extensions@2024-11-01' = {
+  parent: virtualMachine
+  name: 'AADLoginForWindows'
+  location: location
+  properties: {
+    publisher: 'Microsoft.Azure.ActiveDirectory'
+    type: 'AADLoginForWindows'
+    typeHandlerVersion: '2.2'
+    autoUpgradeMinorVersion: true
+  }
+}
+
+resource entraLoginRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(entraLoginObjectId)) {
+  name: guid(virtualMachine.id, entraLoginObjectId, vmUserLoginRoleDefinitionId)
+  scope: virtualMachine
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', vmUserLoginRoleDefinitionId)
+    principalId: entraLoginObjectId
+    principalType: 'User'
+  }
+}
+
 resource initializeLabVm 'Microsoft.Compute/virtualMachines/runCommands@2024-11-01' = {
   parent: virtualMachine
   name: 'InitializeLabVm'
   location: location
   properties: {
     source: {
-      script: replace(replace('''
+      script: replace(replace(replace('''
         $ErrorActionPreference = 'Stop'
         $setupRoot = 'C:\LabSetup'
         $setupScript = Join-Path $setupRoot 'Initialize-LabVm.ps1'
         New-Item -ItemType Directory -Path $setupRoot -Force | Out-Null
         [System.IO.File]::WriteAllBytes($setupScript, [Convert]::FromBase64String('__INITIALIZER_BASE64__'))
 
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setupScript -SetupPhase Machine
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setupScript -SetupPhase Machine -IsDocDB __IS_DOCDB__
         if ($LASTEXITCODE -ne 0) { throw "Machine setup failed with exit code $LASTEXITCODE." }
 
-        $localUser = '__ADMIN_USERNAME__'
-        $userHome = "C:\Users\$localUser"
-        $repositoryPath = "C:\Users\$localUser\Documents\cosmos-workshop-2026"
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setupScript -SetupPhase User -UserHomePath $userHome -RepositoryPath $repositoryPath
-        if ($LASTEXITCODE -ne 0) { throw "User profile setup failed with exit code $LASTEXITCODE." }
+        $entraSetupAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$setupScript`" -SetupPhase User -IsDocDB __IS_DOCDB__ -SetupTaskName InitializeEntraUser"
+        $entraSetupTrigger = New-ScheduledTaskTrigger -AtLogOn
+        $entraSetupPrincipal = New-ScheduledTaskPrincipal -GroupId 'BUILTIN\Users' -LogonType Group -RunLevel Limited
+        Register-ScheduledTask -TaskName InitializeEntraUser -Action $entraSetupAction -Trigger $entraSetupTrigger -Principal $entraSetupPrincipal -Force | Out-Null
         Unregister-ScheduledTask -TaskName InitializeLabVm -Confirm:$false -ErrorAction SilentlyContinue
-      ''', '__INITIALIZER_BASE64__', base64(initializerScript)), '__ADMIN_USERNAME__', adminUsername)
+      ''', '__INITIALIZER_BASE64__', base64(initializerScript)), '__ADMIN_USERNAME__', adminUsername), '__IS_DOCDB__', string(isDocDB ? 1 : 0))
     }
     timeoutInSeconds: 7200
     asyncExecution: false

@@ -19,6 +19,7 @@ param diskControllerType = 'NVMe'
 param foundryDeploymentName = 'gpt5mini'
 param foundryModelName = 'gpt-5-mini'
 param foundryModelVersion = '2025-08-07'
+param foundryModelCapacity = 10
 param foundryEmbeddingDeploymentName = 'textembedding3small'
 param foundryEmbeddingModelName = 'text-embedding-3-small'
 param foundryEmbeddingModelVersion = '1'

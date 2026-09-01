@@ -1,0 +1,2747 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "languageVersion": "2.0",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.44.1.10279",
+      "templateHash": "11556862120780881650"
+    }
+  },
+  "parameters": {
+    "envName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4,
+      "metadata": {
+        "description": "Environment name (used in resource naming)"
+      }
+    },
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "Location for all resources"
+      }
+    },
+    "resourceGroupName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the resource group to create or deploy into"
+      }
+    },
+    "fabricRegion": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure region for the Fabric capacity"
+      }
+    },
+    "fabricSkuName": {
+      "type": "string",
+      "allowedValues": [
+        "F2",
+        "F4",
+        "F8",
+        "F16",
+        "F32"
+      ],
+      "metadata": {
+        "description": "Fabric capacity SKU (F2, F4, F8, F16, F32)"
+      }
+    },
+    "deployFabric": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Deploy Microsoft Fabric capacity resources"
+      }
+    },
+    "deployFoundry": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Deploy Azure AI Foundry resources"
+      }
+    },
+    "isDocDB": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Deploy Azure DocumentDB instead of Cosmos DB for NoSQL accounts, databases, and containers."
+      }
+    },
+    "fabricAdminMembers": {
+      "type": "array",
+      "minLength": 1,
+      "metadata": {
+        "description": "Email addresses of Fabric capacity administrators"
+      }
+    },
+    "vmAdminUsername": {
+      "type": "string",
+      "metadata": {
+        "description": "VM admin username (cannot be admin, administrator, root)"
+      }
+    },
+    "vmAdminPassword": {
+      "type": "securestring",
+      "minLength": 12,
+      "metadata": {
+        "description": "Password for the lab VM"
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "metadata": {
+        "description": "VM size (D4s_v3 or compatible)"
+      }
+    },
+    "diskControllerType": {
+      "type": "string",
+      "defaultValue": "SCSI",
+      "metadata": {
+        "description": "Disk controller type - use NVMe for v5/v6 series sizes that support it"
+      }
+    },
+    "vmComputerName": {
+      "type": "string",
+      "metadata": {
+        "description": "Computer name for the lab VM"
+      }
+    },
+    "applyVmSecurityType": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Apply VM securityType during deployment. Use true for initial create, false for reruns when VM already exists."
+      }
+    },
+    "foundryDeploymentName": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure AI Foundry (single-project) chat model deployment name"
+      }
+    },
+    "foundryModelName": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure AI Foundry chat model name"
+      }
+    },
+    "foundryModelVersion": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure AI Foundry chat model version"
+      }
+    },
+    "foundryModelCapacity": {
+      "type": "int",
+      "defaultValue": 10,
+      "metadata": {
+        "description": "Azure AI Foundry chat model deployment capacity in thousands of tokens per minute"
+      }
+    },
+    "foundryEmbeddingDeploymentName": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure AI Foundry embedding model deployment name"
+      }
+    },
+    "foundryEmbeddingModelName": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure AI Foundry embedding model name (e.g. text-embedding-3-small)"
+      }
+    },
+    "foundryEmbeddingModelVersion": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure AI Foundry embedding model version"
+      }
+    },
+    "foundryEmbeddingSkuName": {
+      "type": "string",
+      "defaultValue": "GlobalStandard",
+      "metadata": {
+        "description": "Azure AI Foundry embedding model deployment SKU (GlobalStandard has the widest regional availability)"
+      }
+    },
+    "foundrySkuName": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure AI Foundry account SKU (S0 = standard)"
+      }
+    },
+    "aiFoundryProjectName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the default AI Foundry project created in the account"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "metadata": {
+        "description": "Tags for all resources"
+      }
+    },
+    "studentOwnerObjectId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional Entra object ID for the student who should be granted Owner on this resource group"
+      }
+    },
+    "useExistingVnet": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Use the existing workshop VNet and subnet without updating them."
+      }
+    }
+  },
+  "resources": {
+    "labResourceGroup": {
+      "type": "Microsoft.Resources/resourceGroups",
+      "apiVersion": "2025-04-01",
+      "name": "[parameters('resourceGroupName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]"
+    },
+    "lab": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('lab-{0}', uniqueString('lab', deployment().name))]",
+      "resourceGroup": "[parameters('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "envName": {
+            "value": "[parameters('envName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "fabricRegion": {
+            "value": "[parameters('fabricRegion')]"
+          },
+          "fabricSkuName": {
+            "value": "[parameters('fabricSkuName')]"
+          },
+          "deployFabric": {
+            "value": "[parameters('deployFabric')]"
+          },
+          "deployFoundry": {
+            "value": "[parameters('deployFoundry')]"
+          },
+          "isDocDB": {
+            "value": "[parameters('isDocDB')]"
+          },
+          "fabricAdminMembers": {
+            "value": "[parameters('fabricAdminMembers')]"
+          },
+          "vmAdminUsername": {
+            "value": "[parameters('vmAdminUsername')]"
+          },
+          "vmAdminPassword": {
+            "value": "[parameters('vmAdminPassword')]"
+          },
+          "vmSize": {
+            "value": "[parameters('vmSize')]"
+          },
+          "diskControllerType": {
+            "value": "[parameters('diskControllerType')]"
+          },
+          "vmComputerName": {
+            "value": "[parameters('vmComputerName')]"
+          },
+          "applyVmSecurityType": {
+            "value": "[parameters('applyVmSecurityType')]"
+          },
+          "foundryDeploymentName": {
+            "value": "[parameters('foundryDeploymentName')]"
+          },
+          "foundryModelName": {
+            "value": "[parameters('foundryModelName')]"
+          },
+          "foundryModelVersion": {
+            "value": "[parameters('foundryModelVersion')]"
+          },
+          "foundryModelCapacity": {
+            "value": "[parameters('foundryModelCapacity')]"
+          },
+          "foundryEmbeddingDeploymentName": {
+            "value": "[parameters('foundryEmbeddingDeploymentName')]"
+          },
+          "foundryEmbeddingModelName": {
+            "value": "[parameters('foundryEmbeddingModelName')]"
+          },
+          "foundryEmbeddingModelVersion": {
+            "value": "[parameters('foundryEmbeddingModelVersion')]"
+          },
+          "foundryEmbeddingSkuName": {
+            "value": "[parameters('foundryEmbeddingSkuName')]"
+          },
+          "foundrySkuName": {
+            "value": "[parameters('foundrySkuName')]"
+          },
+          "aiFoundryProjectName": {
+            "value": "[parameters('aiFoundryProjectName')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "studentOwnerObjectId": {
+            "value": "[parameters('studentOwnerObjectId')]"
+          },
+          "useExistingVnet": {
+            "value": "[parameters('useExistingVnet')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.44.1.10279",
+              "templateHash": "1038127429262816399"
+            }
+          },
+          "parameters": {
+            "envName": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4,
+              "metadata": {
+                "description": "Environment name (used in resource naming)"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Location for all resources"
+              }
+            },
+            "fabricRegion": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for the Fabric capacity"
+              }
+            },
+            "fabricSkuName": {
+              "type": "string",
+              "allowedValues": [
+                "F2",
+                "F4",
+                "F8",
+                "F16",
+                "F32"
+              ],
+              "metadata": {
+                "description": "Fabric capacity SKU (F2, F4, F8, F16, F32)"
+              }
+            },
+            "deployFabric": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Deploy Microsoft Fabric capacity resources"
+              }
+            },
+            "deployFoundry": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Deploy Azure AI Foundry resources"
+              }
+            },
+            "isDocDB": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Deploy Azure DocumentDB instead of Cosmos DB for NoSQL accounts, databases, and containers."
+              }
+            },
+            "fabricAdminMembers": {
+              "type": "array",
+              "minLength": 1,
+              "metadata": {
+                "description": "Email addresses of Fabric capacity administrators"
+              }
+            },
+            "vmAdminUsername": {
+              "type": "string",
+              "metadata": {
+                "description": "VM admin username (cannot be admin, administrator, root)"
+              }
+            },
+            "vmAdminPassword": {
+              "type": "securestring",
+              "minLength": 12,
+              "metadata": {
+                "description": "Password for the lab VM"
+              }
+            },
+            "vmSize": {
+              "type": "string",
+              "metadata": {
+                "description": "VM size (D4s_v3 or compatible)"
+              }
+            },
+            "diskControllerType": {
+              "type": "string",
+              "defaultValue": "SCSI",
+              "metadata": {
+                "description": "Disk controller type - use NVMe for v5/v6 series sizes that support it"
+              }
+            },
+            "vmComputerName": {
+              "type": "string",
+              "metadata": {
+                "description": "Computer name for the lab VM"
+              }
+            },
+            "applyVmSecurityType": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Apply VM securityType during deployment. Use true for initial create, false for reruns when VM already exists."
+              }
+            },
+            "foundryDeploymentName": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure AI Foundry (single-project) chat model deployment name"
+              }
+            },
+            "foundryModelName": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure AI Foundry chat model name"
+              }
+            },
+            "foundryModelVersion": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure AI Foundry chat model version"
+              }
+            },
+            "foundryModelCapacity": {
+              "type": "int",
+              "defaultValue": 10,
+              "metadata": {
+                "description": "Azure AI Foundry chat model deployment capacity in thousands of tokens per minute"
+              }
+            },
+            "foundryEmbeddingDeploymentName": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure AI Foundry embedding model deployment name"
+              }
+            },
+            "foundryEmbeddingModelName": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure AI Foundry embedding model name (e.g. text-embedding-3-small)"
+              }
+            },
+            "foundryEmbeddingModelVersion": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure AI Foundry embedding model version"
+              }
+            },
+            "foundryEmbeddingSkuName": {
+              "type": "string",
+              "defaultValue": "GlobalStandard",
+              "metadata": {
+                "description": "Azure AI Foundry embedding model deployment SKU (GlobalStandard has the widest regional availability)"
+              }
+            },
+            "foundrySkuName": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure AI Foundry account SKU (S0 = standard)"
+              }
+            },
+            "aiFoundryProjectName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the default AI Foundry project created in the account"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Tags for all resources"
+              }
+            },
+            "studentOwnerObjectId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Optional Entra object ID for the student who should be granted Owner on this resource group"
+              }
+            },
+            "useExistingVnet": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Use the existing workshop VNet and subnet without updating them."
+              }
+            }
+          },
+          "variables": {
+            "uniqueSuffix": "[toLower(uniqueString(resourceGroup().id))]",
+            "cosmosDbName": "[format('cosmos{0}{1}', parameters('envName'), variables('uniqueSuffix'))]",
+            "cosmosDbProvisionedName": "[format('cosmos-provisioned-{0}{1}', parameters('envName'), variables('uniqueSuffix'))]",
+            "documentDbName": "[format('docdb-{0}-{1}', parameters('envName'), variables('uniqueSuffix'))]",
+            "aiFoundryName": "[format('aifoundry{0}{1}', parameters('envName'), variables('uniqueSuffix'))]",
+            "fabricCapacityName": "[format('fabric{0}{1}', parameters('envName'), variables('uniqueSuffix'))]",
+            "vmName": "[format('lab-vm-{0}-01', parameters('envName'))]",
+            "ownerRoleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '8e3af657-a8ff-443c-a75c-2fe8c4bcb635')]"
+          },
+          "resources": [
+            {
+              "condition": "[not(empty(parameters('studentOwnerObjectId')))]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "name": "[guid(resourceGroup().id, parameters('studentOwnerObjectId'), variables('ownerRoleDefinitionId'))]",
+              "properties": {
+                "roleDefinitionId": "[variables('ownerRoleDefinitionId')]",
+                "principalId": "[parameters('studentOwnerObjectId')]",
+                "principalType": "User"
+              }
+            },
+            {
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2025-04-01",
+              "name": "networking",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "location": {
+                    "value": "[parameters('location')]"
+                  },
+                  "envName": {
+                    "value": "[parameters('envName')]"
+                  },
+                  "useExistingVnet": {
+                    "value": "[parameters('useExistingVnet')]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "languageVersion": "2.0",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.44.1.10279",
+                      "templateHash": "14297091923809160005"
+                    }
+                  },
+                  "parameters": {
+                    "location": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Location for the networking resources"
+                      }
+                    },
+                    "envName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Environment name (used in resource naming)"
+                      }
+                    },
+                    "useExistingVnet": {
+                      "type": "bool",
+                      "defaultValue": false,
+                      "metadata": {
+                        "description": "Use the existing workshop VNet and subnet without updating them."
+                      }
+                    }
+                  },
+                  "variables": {
+                    "bastionPublicIpName": "[format('{0}-bastion-public-ip', parameters('envName'))]",
+                    "bastionName": "[format('{0}-bastion', parameters('envName'))]",
+                    "vnetName": "[format('{0}-vnet', parameters('envName'))]",
+                    "subnetName": "[format('{0}-subnet', parameters('envName'))]",
+                    "bastionSubnetName": "AzureBastionSubnet",
+                    "privateEndpointSubnetName": "[format('{0}-private-endpoints', parameters('envName'))]",
+                    "vmName": "[format('lab-vm-{0}-01', parameters('envName'))]",
+                    "nicName": "[format('{0}Nic', variables('vmName'))]"
+                  },
+                  "resources": {
+                    "bastionPublicIp": {
+                      "type": "Microsoft.Network/publicIPAddresses",
+                      "apiVersion": "2024-05-01",
+                      "name": "[variables('bastionPublicIpName')]",
+                      "location": "[parameters('location')]",
+                      "sku": {
+                        "name": "Standard"
+                      },
+                      "properties": {
+                        "publicIPAllocationMethod": "Static"
+                      }
+                    },
+                    "vnet": {
+                      "condition": "[not(parameters('useExistingVnet'))]",
+                      "type": "Microsoft.Network/virtualNetworks",
+                      "apiVersion": "2022-05-01",
+                      "name": "[variables('vnetName')]",
+                      "location": "[parameters('location')]",
+                      "properties": {
+                        "addressSpace": {
+                          "addressPrefixes": [
+                            "10.0.0.0/16"
+                          ]
+                        },
+                        "subnets": [
+                          {
+                            "name": "[variables('subnetName')]",
+                            "properties": {
+                              "addressPrefix": "10.0.0.0/24"
+                            }
+                          },
+                          {
+                            "name": "[variables('bastionSubnetName')]",
+                            "properties": {
+                              "addressPrefix": "10.0.1.0/26"
+                            }
+                          },
+                          {
+                            "name": "[variables('privateEndpointSubnetName')]",
+                            "properties": {
+                              "addressPrefix": "10.0.2.0/24",
+                              "privateEndpointNetworkPolicies": "Disabled"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "existingVnet": {
+                      "condition": "[parameters('useExistingVnet')]",
+                      "existing": true,
+                      "type": "Microsoft.Network/virtualNetworks",
+                      "apiVersion": "2024-05-01",
+                      "name": "[variables('vnetName')]"
+                    },
+                    "existingBastionSubnet": {
+                      "condition": "[parameters('useExistingVnet')]",
+                      "@options": {
+                        "onlyIfNotExists": []
+                      },
+                      "type": "Microsoft.Network/virtualNetworks/subnets",
+                      "apiVersion": "2024-05-01",
+                      "name": "[format('{0}/{1}', variables('vnetName'), variables('bastionSubnetName'))]",
+                      "properties": {
+                        "addressPrefix": "10.0.1.0/26"
+                      }
+                    },
+                    "existingPrivateEndpointSubnet": {
+                      "condition": "[parameters('useExistingVnet')]",
+                      "@options": {
+                        "onlyIfNotExists": []
+                      },
+                      "type": "Microsoft.Network/virtualNetworks/subnets",
+                      "apiVersion": "2024-05-01",
+                      "name": "[format('{0}/{1}', variables('vnetName'), variables('privateEndpointSubnetName'))]",
+                      "properties": {
+                        "addressPrefix": "10.0.2.0/24",
+                        "privateEndpointNetworkPolicies": "Disabled"
+                      }
+                    },
+                    "bastion": {
+                      "type": "Microsoft.Network/bastionHosts",
+                      "apiVersion": "2024-05-01",
+                      "name": "[variables('bastionName')]",
+                      "location": "[parameters('location')]",
+                      "sku": {
+                        "name": "Standard"
+                      },
+                      "properties": {
+                        "enableShareableLink": true,
+                        "ipConfigurations": [
+                          {
+                            "name": "bastion-ip-configuration",
+                            "properties": {
+                              "privateIPAllocationMethod": "Dynamic",
+                              "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('bastionPublicIpName'))]"
+                              },
+                              "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), variables('bastionSubnetName'))]"
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "dependsOn": [
+                        "bastionPublicIp",
+                        "existingBastionSubnet",
+                        "vnet"
+                      ]
+                    },
+                    "nic": {
+                      "type": "Microsoft.Network/networkInterfaces",
+                      "apiVersion": "2022-11-01",
+                      "name": "[variables('nicName')]",
+                      "location": "[parameters('location')]",
+                      "properties": {
+                        "ipConfigurations": [
+                          {
+                            "name": "ipconfig1",
+                            "properties": {
+                              "privateIPAllocationMethod": "Dynamic",
+                              "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), variables('subnetName'))]"
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "dependsOn": [
+                        "vnet"
+                      ]
+                    }
+                  },
+                  "outputs": {
+                    "nicId": {
+                      "type": "string",
+                      "value": "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
+                    },
+                    "vnetId": {
+                      "type": "string",
+                      "value": "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]"
+                    },
+                    "privateEndpointSubnetId": {
+                      "type": "string",
+                      "value": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), variables('privateEndpointSubnetName'))]"
+                    },
+                    "bastionName": {
+                      "type": "string",
+                      "value": "[variables('bastionName')]"
+                    },
+                    "bastionId": {
+                      "type": "string",
+                      "value": "[resourceId('Microsoft.Network/bastionHosts', variables('bastionName'))]"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "condition": "[not(parameters('isDocDB'))]",
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2025-04-01",
+              "name": "cosmos-serverless",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "accountName": {
+                    "value": "[variables('cosmosDbName')]"
+                  },
+                  "location": {
+                    "value": "[parameters('location')]"
+                  },
+                  "tags": {
+                    "value": "[parameters('tags')]"
+                  },
+                  "studentOwnerObjectId": {
+                    "value": "[parameters('studentOwnerObjectId')]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.44.1.10279",
+                      "templateHash": "6634702494482244989"
+                    }
+                  },
+                  "parameters": {
+                    "accountName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Cosmos DB account name"
+                      }
+                    },
+                    "location": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Location for the Cosmos DB account"
+                      }
+                    },
+                    "tags": {
+                      "type": "object",
+                      "metadata": {
+                        "description": "Tags applied to the account"
+                      }
+                    },
+                    "studentOwnerObjectId": {
+                      "type": "string",
+                      "defaultValue": "",
+                      "metadata": {
+                        "description": "Optional Entra object ID to grant Cosmos DB data-plane (SQL) access on this account"
+                      }
+                    }
+                  },
+                  "variables": {
+                    "dataContributorRoleId": "[format('{0}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002', resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName')))]",
+                    "vectorEmbeddingPolicy": {
+                      "vectorEmbeddings": [
+                        {
+                          "path": "/embedding",
+                          "dataType": "float32",
+                          "distanceFunction": "cosine",
+                          "dimensions": 1536
+                        }
+                      ]
+                    },
+                    "indexingPolicyWithVector": {
+                      "indexingMode": "consistent",
+                      "automatic": true,
+                      "includedPaths": [
+                        {
+                          "path": "/*"
+                        }
+                      ],
+                      "excludedPaths": [
+                        {
+                          "path": "/_etag/?"
+                        },
+                        {
+                          "path": "/embedding/*"
+                        }
+                      ],
+                      "vectorIndexes": [
+                        {
+                          "path": "/embedding",
+                          "type": "DiskANN"
+                        }
+                      ],
+                      "fullTextIndexes": [
+                        {
+                          "path": "/text"
+                        },
+                        {
+                          "path": "/title"
+                        }
+                      ]
+                    },
+                    "fullTextPolicy": {
+                      "defaultLanguage": "en-US",
+                      "fullTextPaths": [
+                        {
+                          "path": "/text",
+                          "language": "en-US"
+                        },
+                        {
+                          "path": "/title",
+                          "language": "en-US"
+                        }
+                      ]
+                    },
+                    "modelingReferenceContainerNames": [
+                      "Customers",
+                      "Addresses",
+                      "ProductCategories",
+                      "Products",
+                      "Orders",
+                      "OrderItems"
+                    ],
+                    "modelingEmbedContainerNames": [
+                      "Customers",
+                      "Products",
+                      "Orders"
+                    ]
+                  },
+                  "resources": [
+                    {
+                      "type": "Microsoft.DocumentDB/databaseAccounts",
+                      "apiVersion": "2024-11-15",
+                      "name": "[parameters('accountName')]",
+                      "location": "[parameters('location')]",
+                      "kind": "GlobalDocumentDB",
+                      "tags": "[parameters('tags')]",
+                      "properties": {
+                        "databaseAccountOfferType": "Standard",
+                        "publicNetworkAccess": "Disabled",
+                        "disableLocalAuth": true,
+                        "backupPolicy": {
+                          "type": "Continuous",
+                          "continuousModeProperties": {
+                            "tier": "Continuous7Days"
+                          }
+                        },
+                        "capabilities": [
+                          {
+                            "name": "EnableServerless"
+                          },
+                          {
+                            "name": "EnableNoSQLVectorSearch"
+                          }
+                        ],
+                        "consistencyPolicy": {
+                          "defaultConsistencyLevel": "Session",
+                          "maxIntervalInSeconds": 5,
+                          "maxStalenessPrefix": 100
+                        },
+                        "locations": [
+                          {
+                            "failoverPriority": 0,
+                            "isZoneRedundant": false,
+                            "locationName": "[parameters('location')]"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "condition": "[not(empty(parameters('studentOwnerObjectId')))]",
+                      "type": "Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments",
+                      "apiVersion": "2024-11-15",
+                      "name": "[format('{0}/{1}', parameters('accountName'), guid(resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName')), parameters('studentOwnerObjectId'), variables('dataContributorRoleId')))]",
+                      "properties": {
+                        "roleDefinitionId": "[variables('dataContributorRoleId')]",
+                        "principalId": "[parameters('studentOwnerObjectId')]",
+                        "scope": "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+                      ]
+                    },
+                    {
+                      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+                      "apiVersion": "2024-11-15",
+                      "name": "[format('{0}/{1}', parameters('accountName'), 'Conversations')]",
+                      "properties": {
+                        "resource": {
+                          "id": "Conversations"
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+                      ]
+                    },
+                    {
+                      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+                      "apiVersion": "2024-11-15",
+                      "name": "[format('{0}/{1}/{2}', parameters('accountName'), 'Conversations', 'Messages')]",
+                      "properties": {
+                        "resource": {
+                          "id": "Messages",
+                          "partitionKey": {
+                            "paths": [
+                              "/sessionId"
+                            ],
+                            "kind": "Hash"
+                          },
+                          "indexingPolicy": {
+                            "indexingMode": "consistent",
+                            "includedPaths": [
+                              {
+                                "path": "/*"
+                              }
+                            ],
+                            "excludedPaths": [
+                              {
+                                "path": "/_etag/?"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'Conversations')]"
+                      ]
+                    },
+                    {
+                      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+                      "apiVersion": "2024-11-15",
+                      "name": "[format('{0}/{1}', parameters('accountName'), 'WorkshopData')]",
+                      "properties": {
+                        "resource": {
+                          "id": "WorkshopData"
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+                      ]
+                    },
+                    {
+                      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+                      "apiVersion": "2024-11-15",
+                      "name": "[format('{0}/{1}/{2}', parameters('accountName'), 'WorkshopData', 'Catalog')]",
+                      "properties": {
+                        "resource": {
+                          "id": "Catalog",
+                          "partitionKey": {
+                            "paths": [
+                              "/partitionKey"
+                            ],
+                            "kind": "Hash"
+                          },
+                          "indexingPolicy": {
+                            "indexingMode": "consistent",
+                            "includedPaths": [
+                              {
+                                "path": "/*"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'WorkshopData')]"
+                      ]
+                    },
+                    {
+                      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+                      "apiVersion": "2024-11-15",
+                      "name": "[format('{0}/{1}/{2}', parameters('accountName'), 'WorkshopData', 'Docs')]",
+                      "properties": {
+                        "resource": {
+                          "id": "Docs",
+                          "partitionKey": {
+                            "paths": [
+                              "/partitionKey"
+                            ],
+                            "kind": "Hash"
+                          },
+                          "vectorEmbeddingPolicy": "[variables('vectorEmbeddingPolicy')]",
+                          "fullTextPolicy": "[variables('fullTextPolicy')]",
+                          "indexingPolicy": "[variables('indexingPolicyWithVector')]"
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'WorkshopData')]"
+                      ]
+                    },
+                    {
+                      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+                      "apiVersion": "2024-11-15",
+                      "name": "[format('{0}/{1}/{2}', parameters('accountName'), 'WorkshopData', 'ItemsDefaultIndex')]",
+                      "properties": {
+                        "resource": {
+                          "id": "ItemsDefaultIndex",
+                          "partitionKey": {
+                            "paths": [
+                              "/partitionKey"
+                            ],
+                            "kind": "Hash"
+                          },
+                          "indexingPolicy": {
+                            "indexingMode": "consistent",
+                            "automatic": true,
+                            "includedPaths": [
+                              {
+                                "path": "/*"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'WorkshopData')]"
+                      ]
+                    },
+                    {
+                      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+                      "apiVersion": "2024-11-15",
+                      "name": "[format('{0}/{1}/{2}', parameters('accountName'), 'WorkshopData', 'ItemsCustomIndex')]",
+                      "properties": {
+                        "resource": {
+                          "id": "ItemsCustomIndex",
+                          "partitionKey": {
+                            "paths": [
+                              "/partitionKey"
+                            ],
+                            "kind": "Hash"
+                          },
+                          "indexingPolicy": {
+                            "indexingMode": "consistent",
+                            "automatic": true,
+                            "includedPaths": [
+                              {
+                                "path": "/*"
+                              }
+                            ],
+                            "excludedPaths": [
+                              {
+                                "path": "/largeBlob/?"
+                              },
+                              {
+                                "path": "/metadata/*"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'WorkshopData')]"
+                      ]
+                    },
+                    {
+                      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+                      "apiVersion": "2024-11-15",
+                      "name": "[format('{0}/{1}', parameters('accountName'), 'ModelingReference')]",
+                      "properties": {
+                        "resource": {
+                          "id": "ModelingReference"
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+                      ]
+                    },
+                    {
+                      "copy": {
+                        "name": "modelingReferenceContainers",
+                        "count": "[length(variables('modelingReferenceContainerNames'))]"
+                      },
+                      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+                      "apiVersion": "2024-11-15",
+                      "name": "[format('{0}/{1}/{2}', parameters('accountName'), 'ModelingReference', variables('modelingReferenceContainerNames')[copyIndex()])]",
+                      "properties": {
+                        "resource": {
+                          "id": "[variables('modelingReferenceContainerNames')[copyIndex()]]",
+                          "partitionKey": {
+                            "paths": [
+                              "/partitionKey"
+                            ],
+                            "kind": "Hash"
+                          },
+                          "indexingPolicy": {
+                            "indexingMode": "consistent",
+                            "includedPaths": [
+                              {
+                                "path": "/*"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'ModelingReference')]"
+                      ]
+                    },
+                    {
+                      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+                      "apiVersion": "2024-11-15",
+                      "name": "[format('{0}/{1}', parameters('accountName'), 'ModelingEmbed')]",
+                      "properties": {
+                        "resource": {
+                          "id": "ModelingEmbed"
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+                      ]
+                    },
+                    {
+                      "copy": {
+                        "name": "modelingEmbedContainers",
+                        "count": "[length(variables('modelingEmbedContainerNames'))]"
+                      },
+                      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+                      "apiVersion": "2024-11-15",
+                      "name": "[format('{0}/{1}/{2}', parameters('accountName'), 'ModelingEmbed', variables('modelingEmbedContainerNames')[copyIndex()])]",
+                      "properties": {
+                        "resource": {
+                          "id": "[variables('modelingEmbedContainerNames')[copyIndex()]]",
+                          "partitionKey": {
+                            "paths": [
+                              "/partitionKey"
+                            ],
+                            "kind": "Hash"
+                          },
+                          "indexingPolicy": {
+                            "indexingMode": "consistent",
+                            "includedPaths": [
+                              {
+                                "path": "/*"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'ModelingEmbed')]"
+                      ]
+                    }
+                  ],
+                  "outputs": {
+                    "endpoint": {
+                      "type": "string",
+                      "value": "[reference(resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName')), '2024-11-15').documentEndpoint]"
+                    },
+                    "accountId": {
+                      "type": "string",
+                      "value": "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "condition": "[not(parameters('isDocDB'))]",
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2025-04-01",
+              "name": "provisioned-cosmos",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "accountName": {
+                    "value": "[variables('cosmosDbProvisionedName')]"
+                  },
+                  "location": {
+                    "value": "[parameters('location')]"
+                  },
+                  "common": {
+                    "value": {
+                      "envName": "[parameters('envName')]",
+                      "tags": "[parameters('tags')]"
+                    }
+                  },
+                  "autoScaleMaxRU": {
+                    "value": 1000
+                  },
+                  "studentOwnerObjectId": {
+                    "value": "[parameters('studentOwnerObjectId')]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.44.1.10279",
+                      "templateHash": "10931978736519792969"
+                    }
+                  },
+                  "parameters": {
+                    "accountName": {
+                      "type": "string"
+                    },
+                    "location": {
+                      "type": "string"
+                    },
+                    "common": {
+                      "type": "object"
+                    },
+                    "autoScaleMaxRU": {
+                      "type": "int",
+                      "defaultValue": 4000
+                    },
+                    "studentOwnerObjectId": {
+                      "type": "string",
+                      "defaultValue": "",
+                      "metadata": {
+                        "description": "Optional Entra object ID to grant Cosmos DB data-plane (SQL) access on this account"
+                      }
+                    }
+                  },
+                  "variables": {
+                    "dataContributorRoleId": "[format('{0}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002', resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName')))]"
+                  },
+                  "resources": [
+                    {
+                      "type": "Microsoft.DocumentDB/databaseAccounts",
+                      "apiVersion": "2024-11-15",
+                      "name": "[parameters('accountName')]",
+                      "location": "[parameters('location')]",
+                      "kind": "GlobalDocumentDB",
+                      "tags": "[parameters('common').tags]",
+                      "properties": {
+                        "databaseAccountOfferType": "Standard",
+                        "publicNetworkAccess": "Disabled",
+                        "disableLocalAuth": true,
+                        "capabilities": [
+                          {
+                            "name": "EnableNoSQLVectorSearch"
+                          }
+                        ],
+                        "consistencyPolicy": {
+                          "defaultConsistencyLevel": "Session"
+                        },
+                        "locations": [
+                          {
+                            "failoverPriority": 0,
+                            "isZoneRedundant": false,
+                            "locationName": "[parameters('location')]"
+                          }
+                        ],
+                        "enableFreeTier": false
+                      }
+                    },
+                    {
+                      "condition": "[not(empty(parameters('studentOwnerObjectId')))]",
+                      "type": "Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments",
+                      "apiVersion": "2024-11-15",
+                      "name": "[format('{0}/{1}', parameters('accountName'), guid(resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName')), parameters('studentOwnerObjectId'), variables('dataContributorRoleId')))]",
+                      "properties": {
+                        "roleDefinitionId": "[variables('dataContributorRoleId')]",
+                        "principalId": "[parameters('studentOwnerObjectId')]",
+                        "scope": "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+                      ]
+                    },
+                    {
+                      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+                      "apiVersion": "2024-11-15",
+                      "name": "[format('{0}/{1}', parameters('accountName'), 'Modeling')]",
+                      "properties": {
+                        "resource": {
+                          "id": "Modeling"
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+                      ]
+                    },
+                    {
+                      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+                      "apiVersion": "2024-11-15",
+                      "name": "[format('{0}/{1}/{2}', parameters('accountName'), 'Modeling', 'OrdersHot')]",
+                      "properties": {
+                        "resource": {
+                          "id": "OrdersHot",
+                          "partitionKey": {
+                            "paths": [
+                              "/orderDate"
+                            ],
+                            "kind": "Hash"
+                          },
+                          "indexingPolicy": {
+                            "indexingMode": "consistent",
+                            "includedPaths": [
+                              {
+                                "path": "/*"
+                              }
+                            ]
+                          }
+                        },
+                        "options": {
+                          "autoscaleSettings": {
+                            "maxThroughput": "[parameters('autoScaleMaxRU')]"
+                          }
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'Modeling')]"
+                      ]
+                    },
+                    {
+                      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+                      "apiVersion": "2024-11-15",
+                      "name": "[format('{0}/{1}/{2}', parameters('accountName'), 'Modeling', 'OrdersComposite')]",
+                      "properties": {
+                        "resource": {
+                          "id": "OrdersComposite",
+                          "partitionKey": {
+                            "paths": [
+                              "/partitionKey"
+                            ],
+                            "kind": "Hash"
+                          },
+                          "indexingPolicy": {
+                            "indexingMode": "consistent",
+                            "includedPaths": [
+                              {
+                                "path": "/*"
+                              }
+                            ]
+                          }
+                        },
+                        "options": {
+                          "autoscaleSettings": {
+                            "maxThroughput": "[parameters('autoScaleMaxRU')]"
+                          }
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('accountName'), 'Modeling')]"
+                      ]
+                    }
+                  ],
+                  "outputs": {
+                    "accountName": {
+                      "type": "string",
+                      "value": "[parameters('accountName')]"
+                    },
+                    "accountEndpoint": {
+                      "type": "string",
+                      "value": "[reference(resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName')), '2024-11-15').documentEndpoint]"
+                    },
+                    "accountId": {
+                      "type": "string",
+                      "value": "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+                    },
+                    "throughputMode": {
+                      "type": "string",
+                      "value": "Provisioned with autoscale"
+                    },
+                    "maxAutoScaleRU": {
+                      "type": "int",
+                      "value": "[parameters('autoScaleMaxRU')]"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "condition": "[parameters('isDocDB')]",
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2025-04-01",
+              "name": "documentdb",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "clusterName": {
+                    "value": "[variables('documentDbName')]"
+                  },
+                  "location": {
+                    "value": "[parameters('location')]"
+                  },
+                  "adminUsername": {
+                    "value": "[parameters('vmAdminUsername')]"
+                  },
+                  "adminPassword": {
+                    "value": "[parameters('vmAdminPassword')]"
+                  },
+                  "tags": {
+                    "value": "[parameters('tags')]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.44.1.10279",
+                      "templateHash": "18205429395375474470"
+                    }
+                  },
+                  "parameters": {
+                    "clusterName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "DocumentDB cluster name."
+                      }
+                    },
+                    "location": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Location for the DocumentDB cluster."
+                      }
+                    },
+                    "adminUsername": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Administrator username for the DocumentDB cluster."
+                      }
+                    },
+                    "adminPassword": {
+                      "type": "securestring",
+                      "minLength": 8,
+                      "maxLength": 128,
+                      "metadata": {
+                        "description": "Administrator password for the DocumentDB cluster."
+                      }
+                    },
+                    "tags": {
+                      "type": "object",
+                      "metadata": {
+                        "description": "Tags for the DocumentDB cluster."
+                      }
+                    }
+                  },
+                  "resources": [
+                    {
+                      "type": "Microsoft.DocumentDB/mongoClusters",
+                      "apiVersion": "2025-09-01",
+                      "name": "[parameters('clusterName')]",
+                      "location": "[parameters('location')]",
+                      "tags": "[parameters('tags')]",
+                      "properties": {
+                        "administrator": {
+                          "userName": "[parameters('adminUsername')]",
+                          "password": "[parameters('adminPassword')]"
+                        },
+                        "serverVersion": "8.0",
+                        "sharding": {
+                          "shardCount": 1
+                        },
+                        "storage": {
+                          "sizeGb": 32
+                        },
+                        "highAvailability": {
+                          "targetMode": "Disabled"
+                        },
+                        "compute": {
+                          "tier": "M30"
+                        }
+                      }
+                    },
+                    {
+                      "type": "Microsoft.DocumentDB/mongoClusters/firewallRules",
+                      "apiVersion": "2025-09-01",
+                      "name": "[format('{0}/{1}', parameters('clusterName'), 'AllowAllAzureServices')]",
+                      "properties": {
+                        "startIpAddress": "0.0.0.0",
+                        "endIpAddress": "0.0.0.0"
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.DocumentDB/mongoClusters', parameters('clusterName'))]"
+                      ]
+                    }
+                  ],
+                  "outputs": {
+                    "clusterName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Name of the DocumentDB cluster."
+                      },
+                      "value": "[parameters('clusterName')]"
+                    },
+                    "connectionString": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Connection string for the DocumentDB cluster with a password placeholder."
+                      },
+                      "value": "[reference(resourceId('Microsoft.DocumentDB/mongoClusters', parameters('clusterName')), '2025-09-01').connectionString]"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "condition": "[parameters('deployFoundry')]",
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2025-04-01",
+              "name": "foundry",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "accountName": {
+                    "value": "[variables('aiFoundryName')]"
+                  },
+                  "location": {
+                    "value": "[parameters('location')]"
+                  },
+                  "tags": {
+                    "value": "[parameters('tags')]"
+                  },
+                  "skuName": {
+                    "value": "[parameters('foundrySkuName')]"
+                  },
+                  "projectName": {
+                    "value": "[parameters('aiFoundryProjectName')]"
+                  },
+                  "deploymentName": {
+                    "value": "[parameters('foundryDeploymentName')]"
+                  },
+                  "modelName": {
+                    "value": "[parameters('foundryModelName')]"
+                  },
+                  "modelVersion": {
+                    "value": "[parameters('foundryModelVersion')]"
+                  },
+                  "modelCapacity": {
+                    "value": "[parameters('foundryModelCapacity')]"
+                  },
+                  "embeddingDeploymentName": {
+                    "value": "[parameters('foundryEmbeddingDeploymentName')]"
+                  },
+                  "embeddingModelName": {
+                    "value": "[parameters('foundryEmbeddingModelName')]"
+                  },
+                  "embeddingModelVersion": {
+                    "value": "[parameters('foundryEmbeddingModelVersion')]"
+                  },
+                  "embeddingSkuName": {
+                    "value": "[parameters('foundryEmbeddingSkuName')]"
+                  },
+                  "studentOwnerObjectId": {
+                    "value": "[parameters('studentOwnerObjectId')]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.44.1.10279",
+                      "templateHash": "8603536538626131978"
+                    }
+                  },
+                  "parameters": {
+                    "accountName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "AI Foundry account name (also used as custom subdomain)"
+                      }
+                    },
+                    "location": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Location for the AI Foundry resources"
+                      }
+                    },
+                    "tags": {
+                      "type": "object",
+                      "metadata": {
+                        "description": "Tags applied to the account"
+                      }
+                    },
+                    "skuName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "AI Foundry account SKU (e.g. S0)"
+                      }
+                    },
+                    "projectName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Name of the default AI Foundry project"
+                      }
+                    },
+                    "deploymentName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Chat model deployment name"
+                      }
+                    },
+                    "modelName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Chat model name"
+                      }
+                    },
+                    "modelVersion": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Chat model version"
+                      }
+                    },
+                    "modelCapacity": {
+                      "type": "int",
+                      "metadata": {
+                        "description": "Chat model deployment capacity in thousands of tokens per minute"
+                      }
+                    },
+                    "modelSkuName": {
+                      "type": "string",
+                      "defaultValue": "GlobalStandard",
+                      "metadata": {
+                        "description": "Chat model deployment SKU (GlobalStandard is required for newer models that no longer offer regional Standard)"
+                      }
+                    },
+                    "embeddingDeploymentName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Embedding model deployment name"
+                      }
+                    },
+                    "embeddingModelName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Embedding model name (e.g. text-embedding-3-small)"
+                      }
+                    },
+                    "embeddingModelVersion": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Embedding model version"
+                      }
+                    },
+                    "embeddingSkuName": {
+                      "type": "string",
+                      "defaultValue": "GlobalStandard",
+                      "metadata": {
+                        "description": "Embedding model deployment SKU (GlobalStandard has the widest regional availability)"
+                      }
+                    },
+                    "studentOwnerObjectId": {
+                      "type": "string",
+                      "defaultValue": "",
+                      "metadata": {
+                        "description": "Optional Entra object ID to grant Cognitive Services data-plane access on this account"
+                      }
+                    }
+                  },
+                  "variables": {
+                    "cognitiveServicesContributorRoleId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68')]",
+                    "openAiContributorRoleId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'a001fd3d-188f-4b5d-821b-7da978bf7442')]"
+                  },
+                  "resources": [
+                    {
+                      "type": "Microsoft.CognitiveServices/accounts",
+                      "apiVersion": "2025-06-01",
+                      "name": "[parameters('accountName')]",
+                      "location": "[parameters('location')]",
+                      "kind": "AIServices",
+                      "tags": "[parameters('tags')]",
+                      "identity": {
+                        "type": "SystemAssigned"
+                      },
+                      "sku": {
+                        "name": "[parameters('skuName')]"
+                      },
+                      "properties": {
+                        "allowProjectManagement": true,
+                        "customSubDomainName": "[parameters('accountName')]",
+                        "publicNetworkAccess": "Disabled",
+                        "disableLocalAuth": true
+                      }
+                    },
+                    {
+                      "type": "Microsoft.CognitiveServices/accounts/projects",
+                      "apiVersion": "2025-06-01",
+                      "name": "[format('{0}/{1}', parameters('accountName'), parameters('projectName'))]",
+                      "location": "[parameters('location')]",
+                      "identity": {
+                        "type": "SystemAssigned"
+                      },
+                      "properties": {},
+                      "dependsOn": [
+                        "[resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName'))]"
+                      ]
+                    },
+                    {
+                      "type": "Microsoft.CognitiveServices/accounts/deployments",
+                      "apiVersion": "2025-06-01",
+                      "name": "[format('{0}/{1}', parameters('accountName'), parameters('deploymentName'))]",
+                      "sku": {
+                        "name": "[parameters('modelSkuName')]",
+                        "capacity": "[parameters('modelCapacity')]"
+                      },
+                      "properties": {
+                        "model": {
+                          "format": "OpenAI",
+                          "name": "[parameters('modelName')]",
+                          "version": "[parameters('modelVersion')]"
+                        },
+                        "versionUpgradeOption": "OnceNewDefaultVersionAvailable"
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName'))]"
+                      ]
+                    },
+                    {
+                      "type": "Microsoft.CognitiveServices/accounts/deployments",
+                      "apiVersion": "2025-06-01",
+                      "name": "[format('{0}/{1}', parameters('accountName'), parameters('embeddingDeploymentName'))]",
+                      "sku": {
+                        "name": "[parameters('embeddingSkuName')]",
+                        "capacity": 1
+                      },
+                      "properties": {
+                        "model": {
+                          "format": "OpenAI",
+                          "name": "[parameters('embeddingModelName')]",
+                          "version": "[parameters('embeddingModelVersion')]"
+                        },
+                        "versionUpgradeOption": "OnceNewDefaultVersionAvailable"
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName'))]",
+                        "[resourceId('Microsoft.CognitiveServices/accounts/deployments', parameters('accountName'), parameters('deploymentName'))]"
+                      ]
+                    },
+                    {
+                      "condition": "[not(empty(parameters('studentOwnerObjectId')))]",
+                      "type": "Microsoft.Authorization/roleAssignments",
+                      "apiVersion": "2022-04-01",
+                      "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName'))]",
+                      "name": "[guid(resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName')), parameters('studentOwnerObjectId'), variables('cognitiveServicesContributorRoleId'))]",
+                      "properties": {
+                        "roleDefinitionId": "[variables('cognitiveServicesContributorRoleId')]",
+                        "principalId": "[parameters('studentOwnerObjectId')]",
+                        "principalType": "User"
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName'))]"
+                      ]
+                    },
+                    {
+                      "condition": "[not(empty(parameters('studentOwnerObjectId')))]",
+                      "type": "Microsoft.Authorization/roleAssignments",
+                      "apiVersion": "2022-04-01",
+                      "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName'))]",
+                      "name": "[guid(resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName')), parameters('studentOwnerObjectId'), variables('openAiContributorRoleId'))]",
+                      "properties": {
+                        "roleDefinitionId": "[variables('openAiContributorRoleId')]",
+                        "principalId": "[parameters('studentOwnerObjectId')]",
+                        "principalType": "User"
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName'))]"
+                      ]
+                    }
+                  ],
+                  "outputs": {
+                    "endpoint": {
+                      "type": "string",
+                      "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName')), '2025-06-01').endpoint]"
+                    },
+                    "accountId": {
+                      "type": "string",
+                      "value": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName'))]"
+                    },
+                    "projectName": {
+                      "type": "string",
+                      "value": "[parameters('projectName')]"
+                    },
+                    "deploymentName": {
+                      "type": "string",
+                      "value": "[parameters('deploymentName')]"
+                    },
+                    "embeddingDeploymentName": {
+                      "type": "string",
+                      "value": "[parameters('embeddingDeploymentName')]"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2025-04-01",
+              "name": "private-endpoints",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "location": {
+                    "value": "[parameters('location')]"
+                  },
+                  "envName": {
+                    "value": "[parameters('envName')]"
+                  },
+                  "vnetId": {
+                    "value": "[reference(resourceId('Microsoft.Resources/deployments', 'networking'), '2025-04-01').outputs.vnetId.value]"
+                  },
+                  "subnetId": {
+                    "value": "[reference(resourceId('Microsoft.Resources/deployments', 'networking'), '2025-04-01').outputs.privateEndpointSubnetId.value]"
+                  },
+                  "deployCosmos": {
+                    "value": "[not(parameters('isDocDB'))]"
+                  },
+                  "cosmosServerlessId": "[if(parameters('isDocDB'), createObject('value', ''), createObject('value', reference(resourceId('Microsoft.Resources/deployments', 'cosmos-serverless'), '2025-04-01').outputs.accountId.value))]",
+                  "cosmosProvisionedId": "[if(parameters('isDocDB'), createObject('value', ''), createObject('value', reference(resourceId('Microsoft.Resources/deployments', 'provisioned-cosmos'), '2025-04-01').outputs.accountId.value))]",
+                  "deployFoundry": {
+                    "value": "[parameters('deployFoundry')]"
+                  },
+                  "foundryAccountId": "[if(parameters('deployFoundry'), createObject('value', reference(resourceId('Microsoft.Resources/deployments', 'foundry'), '2025-04-01').outputs.accountId.value), createObject('value', ''))]"
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.44.1.10279",
+                      "templateHash": "17425774632894970301"
+                    }
+                  },
+                  "parameters": {
+                    "location": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Location for private endpoints."
+                      }
+                    },
+                    "envName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Environment name used in resource names."
+                      }
+                    },
+                    "vnetId": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Resource ID of the workshop virtual network."
+                      }
+                    },
+                    "subnetId": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Resource ID of the private endpoint subnet."
+                      }
+                    },
+                    "deployCosmos": {
+                      "type": "bool",
+                      "metadata": {
+                        "description": "Create private endpoints for the two Cosmos DB accounts."
+                      }
+                    },
+                    "cosmosServerlessId": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Resource ID of the serverless Cosmos DB account."
+                      }
+                    },
+                    "cosmosProvisionedId": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Resource ID of the provisioned Cosmos DB account."
+                      }
+                    },
+                    "deployFoundry": {
+                      "type": "bool",
+                      "metadata": {
+                        "description": "Create a private endpoint for Azure AI Foundry."
+                      }
+                    },
+                    "foundryAccountId": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Resource ID of the Azure AI Foundry account."
+                      }
+                    }
+                  },
+                  "resources": [
+                    {
+                      "condition": "[parameters('deployCosmos')]",
+                      "type": "Microsoft.Network/privateDnsZones",
+                      "apiVersion": "2024-06-01",
+                      "name": "privatelink.documents.azure.com",
+                      "location": "global"
+                    },
+                    {
+                      "condition": "[parameters('deployFoundry')]",
+                      "type": "Microsoft.Network/privateDnsZones",
+                      "apiVersion": "2024-06-01",
+                      "name": "privatelink.cognitiveservices.azure.com",
+                      "location": "global"
+                    },
+                    {
+                      "condition": "[parameters('deployFoundry')]",
+                      "type": "Microsoft.Network/privateDnsZones",
+                      "apiVersion": "2024-06-01",
+                      "name": "privatelink.openai.azure.com",
+                      "location": "global"
+                    },
+                    {
+                      "condition": "[parameters('deployFoundry')]",
+                      "type": "Microsoft.Network/privateDnsZones",
+                      "apiVersion": "2024-06-01",
+                      "name": "privatelink.services.ai.azure.com",
+                      "location": "global"
+                    },
+                    {
+                      "condition": "[parameters('deployCosmos')]",
+                      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+                      "apiVersion": "2024-06-01",
+                      "name": "[format('{0}/{1}', 'privatelink.documents.azure.com', format('{0}-vnet-link', parameters('envName')))]",
+                      "location": "global",
+                      "properties": {
+                        "registrationEnabled": false,
+                        "virtualNetwork": {
+                          "id": "[parameters('vnetId')]"
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.documents.azure.com')]"
+                      ]
+                    },
+                    {
+                      "condition": "[parameters('deployFoundry')]",
+                      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+                      "apiVersion": "2024-06-01",
+                      "name": "[format('{0}/{1}', 'privatelink.cognitiveservices.azure.com', format('{0}-vnet-link', parameters('envName')))]",
+                      "location": "global",
+                      "properties": {
+                        "registrationEnabled": false,
+                        "virtualNetwork": {
+                          "id": "[parameters('vnetId')]"
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.cognitiveservices.azure.com')]"
+                      ]
+                    },
+                    {
+                      "condition": "[parameters('deployFoundry')]",
+                      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+                      "apiVersion": "2024-06-01",
+                      "name": "[format('{0}/{1}', 'privatelink.openai.azure.com', format('{0}-vnet-link', parameters('envName')))]",
+                      "location": "global",
+                      "properties": {
+                        "registrationEnabled": false,
+                        "virtualNetwork": {
+                          "id": "[parameters('vnetId')]"
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.openai.azure.com')]"
+                      ]
+                    },
+                    {
+                      "condition": "[parameters('deployFoundry')]",
+                      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+                      "apiVersion": "2024-06-01",
+                      "name": "[format('{0}/{1}', 'privatelink.services.ai.azure.com', format('{0}-vnet-link', parameters('envName')))]",
+                      "location": "global",
+                      "properties": {
+                        "registrationEnabled": false,
+                        "virtualNetwork": {
+                          "id": "[parameters('vnetId')]"
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.services.ai.azure.com')]"
+                      ]
+                    },
+                    {
+                      "condition": "[parameters('deployCosmos')]",
+                      "type": "Microsoft.Network/privateEndpoints",
+                      "apiVersion": "2024-05-01",
+                      "name": "[format('{0}-cosmos-serverless-pe', parameters('envName'))]",
+                      "location": "[parameters('location')]",
+                      "properties": {
+                        "subnet": {
+                          "id": "[parameters('subnetId')]"
+                        },
+                        "privateLinkServiceConnections": [
+                          {
+                            "name": "cosmos-serverless",
+                            "properties": {
+                              "privateLinkServiceId": "[parameters('cosmosServerlessId')]",
+                              "groupIds": [
+                                "Sql"
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "condition": "[parameters('deployCosmos')]",
+                      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+                      "apiVersion": "2024-05-01",
+                      "name": "[format('{0}/{1}', format('{0}-cosmos-serverless-pe', parameters('envName')), 'default')]",
+                      "properties": {
+                        "privateDnsZoneConfigs": [
+                          {
+                            "name": "cosmos-sql",
+                            "properties": {
+                              "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.documents.azure.com')]"
+                            }
+                          }
+                        ]
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.documents.azure.com')]",
+                        "[resourceId('Microsoft.Network/privateEndpoints', format('{0}-cosmos-serverless-pe', parameters('envName')))]"
+                      ]
+                    },
+                    {
+                      "condition": "[parameters('deployCosmos')]",
+                      "type": "Microsoft.Network/privateEndpoints",
+                      "apiVersion": "2024-05-01",
+                      "name": "[format('{0}-cosmos-provisioned-pe', parameters('envName'))]",
+                      "location": "[parameters('location')]",
+                      "properties": {
+                        "subnet": {
+                          "id": "[parameters('subnetId')]"
+                        },
+                        "privateLinkServiceConnections": [
+                          {
+                            "name": "cosmos-provisioned",
+                            "properties": {
+                              "privateLinkServiceId": "[parameters('cosmosProvisionedId')]",
+                              "groupIds": [
+                                "Sql"
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "condition": "[parameters('deployCosmos')]",
+                      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+                      "apiVersion": "2024-05-01",
+                      "name": "[format('{0}/{1}', format('{0}-cosmos-provisioned-pe', parameters('envName')), 'default')]",
+                      "properties": {
+                        "privateDnsZoneConfigs": [
+                          {
+                            "name": "cosmos-sql",
+                            "properties": {
+                              "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.documents.azure.com')]"
+                            }
+                          }
+                        ]
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.documents.azure.com')]",
+                        "[resourceId('Microsoft.Network/privateEndpoints', format('{0}-cosmos-provisioned-pe', parameters('envName')))]"
+                      ]
+                    },
+                    {
+                      "condition": "[parameters('deployFoundry')]",
+                      "type": "Microsoft.Network/privateEndpoints",
+                      "apiVersion": "2024-05-01",
+                      "name": "[format('{0}-foundry-pe', parameters('envName'))]",
+                      "location": "[parameters('location')]",
+                      "properties": {
+                        "subnet": {
+                          "id": "[parameters('subnetId')]"
+                        },
+                        "privateLinkServiceConnections": [
+                          {
+                            "name": "foundry",
+                            "properties": {
+                              "privateLinkServiceId": "[parameters('foundryAccountId')]",
+                              "groupIds": [
+                                "account"
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "condition": "[parameters('deployFoundry')]",
+                      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+                      "apiVersion": "2024-05-01",
+                      "name": "[format('{0}/{1}', format('{0}-foundry-pe', parameters('envName')), 'default')]",
+                      "properties": {
+                        "privateDnsZoneConfigs": [
+                          {
+                            "name": "cognitive-services",
+                            "properties": {
+                              "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.cognitiveservices.azure.com')]"
+                            }
+                          },
+                          {
+                            "name": "openai",
+                            "properties": {
+                              "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.openai.azure.com')]"
+                            }
+                          },
+                          {
+                            "name": "ai-services",
+                            "properties": {
+                              "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.services.ai.azure.com')]"
+                            }
+                          }
+                        ]
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.services.ai.azure.com')]",
+                        "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.cognitiveservices.azure.com')]",
+                        "[resourceId('Microsoft.Network/privateEndpoints', format('{0}-foundry-pe', parameters('envName')))]",
+                        "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.openai.azure.com')]"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Resources/deployments', 'provisioned-cosmos')]",
+                "[resourceId('Microsoft.Resources/deployments', 'cosmos-serverless')]",
+                "[resourceId('Microsoft.Resources/deployments', 'foundry')]",
+                "[resourceId('Microsoft.Resources/deployments', 'networking')]"
+              ]
+            },
+            {
+              "condition": "[parameters('deployFabric')]",
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2025-04-01",
+              "name": "fabric",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "capacityName": {
+                    "value": "[variables('fabricCapacityName')]"
+                  },
+                  "location": {
+                    "value": "[parameters('fabricRegion')]"
+                  },
+                  "tags": {
+                    "value": "[parameters('tags')]"
+                  },
+                  "skuName": {
+                    "value": "[parameters('fabricSkuName')]"
+                  },
+                  "adminMembers": {
+                    "value": "[parameters('fabricAdminMembers')]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.44.1.10279",
+                      "templateHash": "6271961065978710347"
+                    }
+                  },
+                  "parameters": {
+                    "capacityName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Fabric capacity name"
+                      }
+                    },
+                    "location": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Azure region for the Fabric capacity"
+                      }
+                    },
+                    "tags": {
+                      "type": "object",
+                      "metadata": {
+                        "description": "Tags applied to the capacity"
+                      }
+                    },
+                    "skuName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Fabric capacity SKU (F2, F4, F8, F16, F32)"
+                      }
+                    },
+                    "adminMembers": {
+                      "type": "array",
+                      "metadata": {
+                        "description": "Email addresses of Fabric capacity administrators"
+                      }
+                    }
+                  },
+                  "resources": [
+                    {
+                      "type": "Microsoft.Fabric/capacities",
+                      "apiVersion": "2023-11-01",
+                      "name": "[parameters('capacityName')]",
+                      "location": "[parameters('location')]",
+                      "tags": "[parameters('tags')]",
+                      "sku": {
+                        "name": "[parameters('skuName')]",
+                        "tier": "Fabric"
+                      },
+                      "properties": {
+                        "administration": {
+                          "members": "[parameters('adminMembers')]"
+                        }
+                      }
+                    }
+                  ],
+                  "outputs": {
+                    "capacityId": {
+                      "type": "string",
+                      "value": "[resourceId('Microsoft.Fabric/capacities', parameters('capacityName'))]"
+                    },
+                    "capacityName": {
+                      "type": "string",
+                      "value": "[parameters('capacityName')]"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2025-04-01",
+              "name": "[format('vm-{0}', variables('vmName'))]",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "location": {
+                    "value": "[parameters('location')]"
+                  },
+                  "vmName": {
+                    "value": "[variables('vmName')]"
+                  },
+                  "vmComputerName": {
+                    "value": "[parameters('vmComputerName')]"
+                  },
+                  "vmSize": {
+                    "value": "[parameters('vmSize')]"
+                  },
+                  "diskControllerType": {
+                    "value": "[parameters('diskControllerType')]"
+                  },
+                  "adminUsername": {
+                    "value": "[parameters('vmAdminUsername')]"
+                  },
+                  "adminPassword": {
+                    "value": "[parameters('vmAdminPassword')]"
+                  },
+                  "entraLoginObjectId": {
+                    "value": "[parameters('studentOwnerObjectId')]"
+                  },
+                  "nicId": {
+                    "value": "[reference(resourceId('Microsoft.Resources/deployments', 'networking'), '2025-04-01').outputs.nicId.value]"
+                  },
+                  "tags": {
+                    "value": "[parameters('tags')]"
+                  },
+                  "applyVmSecurityType": {
+                    "value": "[parameters('applyVmSecurityType')]"
+                  },
+                  "isDocDB": {
+                    "value": "[parameters('isDocDB')]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.44.1.10279",
+                      "templateHash": "17910373241858403117"
+                    }
+                  },
+                  "parameters": {
+                    "location": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Location for the VM"
+                      }
+                    },
+                    "vmName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Name of the VM resource"
+                      }
+                    },
+                    "vmComputerName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Computer name for the VM OS profile"
+                      }
+                    },
+                    "vmSize": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "VM size"
+                      }
+                    },
+                    "diskControllerType": {
+                      "type": "string",
+                      "defaultValue": "SCSI",
+                      "metadata": {
+                        "description": "Disk controller type - use NVMe for v5/v6 series sizes that support it"
+                      }
+                    },
+                    "adminUsername": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "VM admin username"
+                      }
+                    },
+                    "adminPassword": {
+                      "type": "securestring",
+                      "minLength": 12,
+                      "metadata": {
+                        "description": "VM admin password"
+                      }
+                    },
+                    "entraLoginObjectId": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Entra object ID to grant Windows VM sign-in access."
+                      }
+                    },
+                    "nicId": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "NIC resource ID to attach to the VM"
+                      }
+                    },
+                    "tags": {
+                      "type": "object",
+                      "metadata": {
+                        "description": "Tags applied to the VM"
+                      }
+                    },
+                    "applyVmSecurityType": {
+                      "type": "bool",
+                      "defaultValue": true,
+                      "metadata": {
+                        "description": "Set to true when creating a VM so securityType is stamped; set false for no-op reruns to avoid immutable property updates"
+                      }
+                    },
+                    "isDocDB": {
+                      "type": "bool",
+                      "defaultValue": false,
+                      "metadata": {
+                        "description": "Install Azure DocumentDB extensions and MongoDB command-line tools"
+                      }
+                    }
+                  },
+                  "variables": {
+                    "vmUserLoginRoleDefinitionId": "fb879cbe-42f0-422f-9e78-4cbd5e659c3e",
+                    "vmPropertiesBase": {
+                      "identity": {
+                        "type": "SystemAssigned"
+                      },
+                      "hardwareProfile": {
+                        "vmSize": "[parameters('vmSize')]"
+                      },
+                      "storageProfile": {
+                        "diskControllerType": "[parameters('diskControllerType')]",
+                        "osDisk": {
+                          "createOption": "fromImage",
+                          "managedDisk": {
+                            "storageAccountType": "Premium_LRS"
+                          },
+                          "deleteOption": "Delete"
+                        },
+                        "imageReference": {
+                          "publisher": "MicrosoftWindowsDesktop",
+                          "offer": "windows-11",
+                          "sku": "win11-24h2-ent",
+                          "version": "latest"
+                        }
+                      },
+                      "networkProfile": {
+                        "networkInterfaces": [
+                          {
+                            "id": "[parameters('nicId')]",
+                            "properties": {
+                              "deleteOption": "Detach"
+                            }
+                          }
+                        ]
+                      },
+                      "additionalCapabilities": {
+                        "hibernationEnabled": false
+                      },
+                      "osProfile": {
+                        "computerName": "[parameters('vmComputerName')]",
+                        "adminUsername": "[parameters('adminUsername')]",
+                        "adminPassword": "[parameters('adminPassword')]",
+                        "windowsConfiguration": {
+                          "enableAutomaticUpdates": true,
+                          "provisionVMAgent": true,
+                          "patchSettings": {
+                            "patchMode": "AutomaticByOS",
+                            "assessmentMode": "ImageDefault",
+                            "enableHotpatching": false
+                          }
+                        }
+                      },
+                      "diagnosticsProfile": {
+                        "bootDiagnostics": {
+                          "enabled": true
+                        }
+                      }
+                    },
+                    "vmSecurityProfile": "[if(parameters('applyVmSecurityType'), createObject('securityProfile', createObject('securityType', 'TrustedLaunch', 'uefiSettings', createObject('secureBootEnabled', true(), 'vTpmEnabled', true()))), createObject())]",
+                    "initializerScript": "[CmdletBinding()]\r\nparam(\r\n  [Parameter(Mandatory = $false)]\r\n  [string]$RepositoryUrl = 'https://github.com/AzureCosmosDB/cosmos-workshop-2026.git',\r\n\r\n  [Parameter(Mandatory = $false)]\r\n  [string]$RepositoryPath = '',\r\n\r\n  [Parameter(Mandatory = $false)]\r\n  [string]$UserHomePath = '',\r\n\r\n  [Parameter(Mandatory = $false)]\r\n  [string]$SetupTaskName,\r\n\r\n  [Parameter(Mandatory = $false)]\r\n  [int]$IsDocDB = 0,\r\n\r\n  [Parameter(Mandatory = $false)]\r\n  [ValidateSet('All', 'Machine', 'User')]\r\n  [string]$SetupPhase = 'All'\r\n)\r\n\r\n$ErrorActionPreference = 'Stop'\r\n\r\nfunction Update-PathFromRegistry {\r\n  $machine = [Environment]::GetEnvironmentVariable('Path', 'Machine')\r\n  $user    = [Environment]::GetEnvironmentVariable('Path', 'User')\r\n  $env:Path = (@($machine, $user) | Where-Object { $_ }) -join ';'\r\n}\r\n\r\nfunction Invoke-Chocolatey {\r\n  param([Parameter(Mandatory)][string]$Package)\r\n\r\n  for ($attempt = 1; $attempt -le 3; $attempt++) {\r\n    Write-Host \"==> choco install $Package (attempt $attempt of 3)\" -ForegroundColor Cyan\r\n    & choco.exe install $Package --yes --no-progress --limit-output\r\n    if ($LASTEXITCODE -eq 0) {\r\n      Update-PathFromRegistry\r\n      return\r\n    }\r\n\r\n    $exitCode = $LASTEXITCODE\r\n    if ($attempt -lt 3) {\r\n      Write-Warning \"choco install '$Package' failed with exit code $exitCode; retrying in 15 seconds.\"\r\n      Start-Sleep -Seconds 15\r\n    }\r\n  }\r\n\r\n  throw \"choco install '$Package' failed after 3 attempts with exit code $exitCode.\"\r\n}\r\n\r\nif ($SetupPhase -in @('All', 'Machine')) {\r\n  if (-not (Get-Command choco.exe -ErrorAction SilentlyContinue)) {\r\n    Write-Host '==> Installing Chocolatey' -ForegroundColor Cyan\r\n    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072\r\n    $installScript = (New-Object Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')\r\n    & ([scriptblock]::Create($installScript))\r\n    Update-PathFromRegistry\r\n  }\r\n\r\n  Invoke-Chocolatey -Package 'powershell-core'\r\n  Invoke-Chocolatey -Package 'azure-cli'\r\n  Invoke-Chocolatey -Package 'git'\r\n  Invoke-Chocolatey -Package 'dotnet-10.0-sdk'\r\n  Invoke-Chocolatey -Package 'python314'\r\n  Invoke-Chocolatey -Package 'vscode'\r\n\r\n  if ($IsDocDB) {\r\n    Invoke-Chocolatey -Package 'nodejs-lts'\r\n    Invoke-Chocolatey -Package 'mongodb-shell'\r\n    Invoke-Chocolatey -Package 'mongodb-database-tools'\r\n  }\r\n}\r\n\r\nif ($SetupPhase -eq 'Machine') {\r\n  Write-Host \"Lab VM machine setup complete.\" -ForegroundColor Green\r\n  exit 0\r\n}\r\n\r\nUpdate-PathFromRegistry\r\n\r\nif (-not $RepositoryPath) {\r\n  $documentsPath = [Environment]::GetFolderPath('MyDocuments')\r\n  if (-not $documentsPath) { throw 'Unable to resolve the current user Documents folder.' }\r\n  $RepositoryPath = Join-Path $documentsPath 'cosmos-workshop-2026'\r\n}\r\n\r\nif (-not $UserHomePath) {\r\n  $UserHomePath = Split-Path (Split-Path $RepositoryPath -Parent) -Parent\r\n}\r\n\r\n$git = Get-Command git.exe -ErrorAction SilentlyContinue\r\nif (-not $git) { throw \"git.exe not found on PATH after install.\" }\r\n\r\nif (Test-Path (Join-Path $RepositoryPath '.git')) {\r\n  Write-Host \"==> Workshop repository already exists at $RepositoryPath\" -ForegroundColor Cyan\r\n}\r\nelseif (Test-Path $RepositoryPath) {\r\n  throw \"Repository path exists but is not a Git repository: $RepositoryPath\"\r\n}\r\nelse {\r\n  $repositoryParent = Split-Path -Parent $RepositoryPath\r\n  New-Item -ItemType Directory -Path $repositoryParent -Force | Out-Null\r\n  Write-Host \"==> Cloning workshop repository to $RepositoryPath\" -ForegroundColor Cyan\r\n  & $git clone $RepositoryUrl $RepositoryPath\r\n  if ($LASTEXITCODE -ne 0) { throw \"Git clone failed with exit code $LASTEXITCODE.\" }\r\n}\r\n\r\n$pythonCommand = Get-Command python.exe -ErrorAction SilentlyContinue\r\n$python = if ($pythonCommand) { $pythonCommand.Source } else { $null }\r\nif (-not $python) { throw \"python.exe not found on PATH after install.\" }\r\n\r\nWrite-Host \"==> Upgrading pip\" -ForegroundColor Cyan\r\n& $python -m pip install --upgrade pip\r\nif ($LASTEXITCODE -ne 0) { throw \"pip upgrade failed.\" }\r\n\r\nWrite-Host \"==> Installing lab pip packages\" -ForegroundColor Cyan\r\n& $python -m pip install ipykernel azure-cosmos azure-identity python-dotenv openai numpy\r\nif ($LASTEXITCODE -ne 0) { throw \"pip install failed.\" }\r\n\r\n$codeCommand = Get-Command code.cmd -ErrorAction SilentlyContinue\r\nif (-not $codeCommand) { $codeCommand = Get-Command code -ErrorAction SilentlyContinue }\r\n$code = if ($codeCommand) { $codeCommand.Source } else { $null }\r\nif (-not $code) {\r\n  throw \"VS Code CLI ('code') not found on PATH after install.\"\r\n}\r\nelse {\r\n  $extensionsPath = Join-Path $UserHomePath '.vscode\\extensions'\r\n  $extensions = @('ms-toolsai.jupyter', 'ms-dotnettools.csharp', 'ms-python.python')\r\n  if ($IsDocDB) {\r\n    $extensions += @(\r\n      'ms-azuretools.vscode-documentdb',\r\n      'ms-azurecosmosdbtools.vscode-mongo-migration'\r\n    )\r\n  }\r\n\r\n  foreach ($ext in $extensions) {\r\n    Write-Host \"==> code --install-extension $ext\" -ForegroundColor Cyan\r\n    & $code --extensions-dir $extensionsPath --install-extension $ext --force\r\n    if ($LASTEXITCODE -ne 0) { throw \"Failed to install VS Code extension '$ext'.\" }\r\n  }\r\n}\r\n\r\nWrite-Host \"\"\r\nWrite-Host \"Lab VM setup complete.\" -ForegroundColor Green\r\nWrite-Host \"Workshop repository: $RepositoryPath\"\r\nWrite-Host \"Remaining manual steps (cannot be automated reliably):\" -ForegroundColor Yellow\r\nWrite-Host \"  - Open PowerShell 7, then run: az login --use-device-code\"\r\nWrite-Host \"  - Change to $RepositoryPath and run: ./SetEnv.ps1\"\r\nWrite-Host \"  - Dismiss the VS Code 'Sign in to GitHub' prompt (students use Azure accounts).\"\r\nWrite-Host \"  - If a WSL update popup appears, press Enter to install.\"\r\n\r\nif ($SetupTaskName) {\r\n  Unregister-ScheduledTask -TaskName $SetupTaskName -Confirm:$false -ErrorAction SilentlyContinue\r\n}\r\n"
+                  },
+                  "resources": [
+                    {
+                      "type": "Microsoft.Compute/virtualMachines",
+                      "apiVersion": "2024-11-01",
+                      "name": "[parameters('vmName')]",
+                      "location": "[parameters('location')]",
+                      "tags": "[parameters('tags')]",
+                      "properties": "[union(variables('vmPropertiesBase'), variables('vmSecurityProfile'))]"
+                    },
+                    {
+                      "type": "Microsoft.Compute/virtualMachines/extensions",
+                      "apiVersion": "2024-11-01",
+                      "name": "[format('{0}/{1}', parameters('vmName'), 'AADLoginForWindows')]",
+                      "location": "[parameters('location')]",
+                      "properties": {
+                        "publisher": "Microsoft.Azure.ActiveDirectory",
+                        "type": "AADLoginForWindows",
+                        "typeHandlerVersion": "2.2",
+                        "autoUpgradeMinorVersion": true
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"
+                      ]
+                    },
+                    {
+                      "condition": "[not(empty(parameters('entraLoginObjectId')))]",
+                      "type": "Microsoft.Authorization/roleAssignments",
+                      "apiVersion": "2022-04-01",
+                      "scope": "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]",
+                      "name": "[guid(resourceId('Microsoft.Compute/virtualMachines', parameters('vmName')), parameters('entraLoginObjectId'), variables('vmUserLoginRoleDefinitionId'))]",
+                      "properties": {
+                        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('vmUserLoginRoleDefinitionId'))]",
+                        "principalId": "[parameters('entraLoginObjectId')]",
+                        "principalType": "User"
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"
+                      ]
+                    },
+                    {
+                      "type": "Microsoft.Compute/virtualMachines/runCommands",
+                      "apiVersion": "2024-11-01",
+                      "name": "[format('{0}/{1}', parameters('vmName'), 'InitializeLabVm')]",
+                      "location": "[parameters('location')]",
+                      "properties": {
+                        "source": {
+                          "script": "[replace(replace(replace('        $ErrorActionPreference = ''Stop''\r\n        $setupRoot = ''C:\\LabSetup''\r\n        $setupScript = Join-Path $setupRoot ''Initialize-LabVm.ps1''\r\n        New-Item -ItemType Directory -Path $setupRoot -Force | Out-Null\r\n        [System.IO.File]::WriteAllBytes($setupScript, [Convert]::FromBase64String(''__INITIALIZER_BASE64__''))\r\n\r\n        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setupScript -SetupPhase Machine -IsDocDB __IS_DOCDB__\r\n        if ($LASTEXITCODE -ne 0) { throw \"Machine setup failed with exit code $LASTEXITCODE.\" }\r\n\r\n        $entraSetupAction = New-ScheduledTaskAction -Execute ''powershell.exe'' -Argument \"-NoProfile -ExecutionPolicy Bypass -File `\"$setupScript`\" -SetupPhase User -IsDocDB __IS_DOCDB__ -SetupTaskName InitializeEntraUser\"\r\n        $entraSetupTrigger = New-ScheduledTaskTrigger -AtLogOn\r\n        $entraSetupPrincipal = New-ScheduledTaskPrincipal -GroupId ''BUILTIN\\Users'' -LogonType Group -RunLevel Limited\r\n        Register-ScheduledTask -TaskName InitializeEntraUser -Action $entraSetupAction -Trigger $entraSetupTrigger -Principal $entraSetupPrincipal -Force | Out-Null\r\n        Unregister-ScheduledTask -TaskName InitializeLabVm -Confirm:$false -ErrorAction SilentlyContinue\r\n      ', '__INITIALIZER_BASE64__', base64(variables('initializerScript'))), '__ADMIN_USERNAME__', parameters('adminUsername')), '__IS_DOCDB__', string(if(parameters('isDocDB'), 1, 0)))]"
+                        },
+                        "timeoutInSeconds": 7200,
+                        "asyncExecution": false,
+                        "treatFailureAsDeploymentFailure": true
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"
+                      ]
+                    }
+                  ],
+                  "outputs": {
+                    "vmId": {
+                      "type": "string",
+                      "value": "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"
+                    },
+                    "vmNameOut": {
+                      "type": "string",
+                      "value": "[parameters('vmName')]"
+                    }
+                  }
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Resources/deployments', 'networking')]"
+              ]
+            }
+          ],
+          "outputs": {
+            "cosmosDbEndpoint": {
+              "type": "string",
+              "value": "[if(parameters('isDocDB'), '', reference(resourceId('Microsoft.Resources/deployments', 'cosmos-serverless'), '2025-04-01').outputs.endpoint.value)]"
+            },
+            "provisionedCosmosEndpoint": {
+              "type": "string",
+              "value": "[if(parameters('isDocDB'), '', reference(resourceId('Microsoft.Resources/deployments', 'provisioned-cosmos'), '2025-04-01').outputs.accountEndpoint.value)]"
+            },
+            "provisionedCosmosThroughputMode": {
+              "type": "string",
+              "value": "[if(parameters('isDocDB'), '', reference(resourceId('Microsoft.Resources/deployments', 'provisioned-cosmos'), '2025-04-01').outputs.throughputMode.value)]"
+            },
+            "provisionedCosmosMaxRU": {
+              "type": "int",
+              "value": "[if(parameters('isDocDB'), 0, reference(resourceId('Microsoft.Resources/deployments', 'provisioned-cosmos'), '2025-04-01').outputs.maxAutoScaleRU.value)]"
+            },
+            "documentDbConnectionString": {
+              "type": "string",
+              "value": "[if(parameters('isDocDB'), reference(resourceId('Microsoft.Resources/deployments', 'documentdb'), '2025-04-01').outputs.connectionString.value, '')]"
+            },
+            "aiFoundryEndpoint": {
+              "type": "string",
+              "value": "[if(parameters('deployFoundry'), reference(resourceId('Microsoft.Resources/deployments', 'foundry'), '2025-04-01').outputs.endpoint.value, '')]"
+            },
+            "aiFoundryProjectName": {
+              "type": "string",
+              "value": "[if(parameters('deployFoundry'), reference(resourceId('Microsoft.Resources/deployments', 'foundry'), '2025-04-01').outputs.projectName.value, '')]"
+            },
+            "chatDeploymentName": {
+              "type": "string",
+              "value": "[if(parameters('deployFoundry'), reference(resourceId('Microsoft.Resources/deployments', 'foundry'), '2025-04-01').outputs.deploymentName.value, '')]"
+            },
+            "embeddingDeploymentName": {
+              "type": "string",
+              "value": "[if(parameters('deployFoundry'), reference(resourceId('Microsoft.Resources/deployments', 'foundry'), '2025-04-01').outputs.embeddingDeploymentName.value, '')]"
+            },
+            "vmPublicIp": {
+              "type": "string",
+              "value": ""
+            },
+            "vmPublicIpAddress": {
+              "type": "string",
+              "value": ""
+            },
+            "bastionName": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Resources/deployments', 'networking'), '2025-04-01').outputs.bastionName.value]"
+            },
+            "bastionId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Resources/deployments', 'networking'), '2025-04-01').outputs.bastionId.value]"
+            },
+            "vmId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Resources/deployments', format('vm-{0}', variables('vmName'))), '2025-04-01').outputs.vmId.value]"
+            },
+            "vmAdminUsernameOut": {
+              "type": "string",
+              "value": "[parameters('vmAdminUsername')]"
+            },
+            "storageAccountBlobEndpoint": {
+              "type": "string",
+              "value": ""
+            },
+            "fabricCapacityId": {
+              "type": "string",
+              "value": "[if(parameters('deployFabric'), reference(resourceId('Microsoft.Resources/deployments', 'fabric'), '2025-04-01').outputs.capacityId.value, '')]"
+            },
+            "cosmosAccountName": {
+              "type": "string",
+              "value": "[if(parameters('isDocDB'), '', variables('cosmosDbName'))]"
+            },
+            "cosmosProvisionedAccountName": {
+              "type": "string",
+              "value": "[if(parameters('isDocDB'), '', variables('cosmosDbProvisionedName'))]"
+            },
+            "documentDbClusterName": {
+              "type": "string",
+              "value": "[if(parameters('isDocDB'), reference(resourceId('Microsoft.Resources/deployments', 'documentdb'), '2025-04-01').outputs.clusterName.value, '')]"
+            },
+            "foundryAccountName": {
+              "type": "string",
+              "value": "[if(parameters('deployFoundry'), variables('aiFoundryName'), '')]"
+            },
+            "storageAccountName": {
+              "type": "string",
+              "value": ""
+            },
+            "vmName": {
+              "type": "string",
+              "value": "[variables('vmName')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "labResourceGroup"
+      ]
+    }
+  },
+  "outputs": {
+    "cosmosDbEndpoint": {
+      "type": "string",
+      "value": "[reference('lab').outputs.cosmosDbEndpoint.value]"
+    },
+    "provisionedCosmosEndpoint": {
+      "type": "string",
+      "value": "[reference('lab').outputs.provisionedCosmosEndpoint.value]"
+    },
+    "provisionedCosmosThroughputMode": {
+      "type": "string",
+      "value": "[reference('lab').outputs.provisionedCosmosThroughputMode.value]"
+    },
+    "provisionedCosmosMaxRU": {
+      "type": "int",
+      "value": "[reference('lab').outputs.provisionedCosmosMaxRU.value]"
+    },
+    "documentDbConnectionString": {
+      "type": "string",
+      "value": "[reference('lab').outputs.documentDbConnectionString.value]"
+    },
+    "aiFoundryEndpoint": {
+      "type": "string",
+      "value": "[reference('lab').outputs.aiFoundryEndpoint.value]"
+    },
+    "aiFoundryProjectName": {
+      "type": "string",
+      "value": "[reference('lab').outputs.aiFoundryProjectName.value]"
+    },
+    "chatDeploymentName": {
+      "type": "string",
+      "value": "[reference('lab').outputs.chatDeploymentName.value]"
+    },
+    "embeddingDeploymentName": {
+      "type": "string",
+      "value": "[reference('lab').outputs.embeddingDeploymentName.value]"
+    },
+    "vmPublicIp": {
+      "type": "string",
+      "value": "[reference('lab').outputs.vmPublicIp.value]"
+    },
+    "vmPublicIpAddress": {
+      "type": "string",
+      "value": "[reference('lab').outputs.vmPublicIpAddress.value]"
+    },
+    "bastionName": {
+      "type": "string",
+      "value": "[reference('lab').outputs.bastionName.value]"
+    },
+    "bastionId": {
+      "type": "string",
+      "value": "[reference('lab').outputs.bastionId.value]"
+    },
+    "vmId": {
+      "type": "string",
+      "value": "[reference('lab').outputs.vmId.value]"
+    },
+    "vmAdminUsernameOut": {
+      "type": "string",
+      "value": "[reference('lab').outputs.vmAdminUsernameOut.value]"
+    },
+    "storageAccountBlobEndpoint": {
+      "type": "string",
+      "value": "[reference('lab').outputs.storageAccountBlobEndpoint.value]"
+    },
+    "fabricCapacityId": {
+      "type": "string",
+      "value": "[reference('lab').outputs.fabricCapacityId.value]"
+    },
+    "cosmosAccountName": {
+      "type": "string",
+      "value": "[reference('lab').outputs.cosmosAccountName.value]"
+    },
+    "cosmosProvisionedAccountName": {
+      "type": "string",
+      "value": "[reference('lab').outputs.cosmosProvisionedAccountName.value]"
+    },
+    "documentDbClusterName": {
+      "type": "string",
+      "value": "[reference('lab').outputs.documentDbClusterName.value]"
+    },
+    "foundryAccountName": {
+      "type": "string",
+      "value": "[reference('lab').outputs.foundryAccountName.value]"
+    },
+    "storageAccountName": {
+      "type": "string",
+      "value": "[reference('lab').outputs.storageAccountName.value]"
+    },
+    "vmName": {
+      "type": "string",
+      "value": "[reference('lab').outputs.vmName.value]"
+    },
+    "resourceGroupNameOut": {
+      "type": "string",
+      "value": "[parameters('resourceGroupName')]"
+    }
+  }
+}

@@ -62,9 +62,11 @@ $COSMOS_ENDPOINT_PROVISIONED = $null
 foreach ($acct in $cosmosAccounts) {
   $isServerless = $false
   if ($acct.capabilities) {
-    $isServerless = [bool]($acct.capabilities | Where-Object { $_.name -eq 'EnableServerless' })
+    $isServerless = [bool]($acct.capabilities | Where-Object {
+      ($_ -is [string] -and $_ -eq 'EnableServerless') -or $_.name -eq 'EnableServerless'
+    })
   }
-  if ($isServerless) {
+  if ($isServerless -or $acct.name -notlike 'cosmos-provisioned-*') {
     $COSMOS_ENDPOINT = $acct.documentEndpoint
   } else {
     $COSMOS_ENDPOINT_PROVISIONED = $acct.documentEndpoint

@@ -1,0 +1,136 @@
+name: Provision Workshop Labs
+
+on:
+  workflow_dispatch:
+    inputs:
+      jobId:
+        description: NoSQLReg provisioning job id
+        required: true
+        type: string
+      eventId:
+        description: NoSQLReg event id
+        required: true
+        type: string
+      studentCount:
+        description: Number of active registrants to provision
+        required: true
+        type: string
+      isDocDB:
+        description: Whether this is a DocumentDB workshop
+        required: true
+        type: choice
+        options:
+          - "true"
+          - "false"
+      labId:
+        description: Stable lab id/batch id
+        required: false
+        type: string
+      location:
+        description: Azure region
+        required: true
+        default: westus
+        type: string
+      vmSize:
+        description: Student VM size
+        required: true
+        default: Standard_F2als_v7
+        type: string
+      callbackUrl:
+        description: NoSQLReg callback URL for lab CSV import
+        required: true
+        type: string
+  schedule:
+    - cron: "17 * * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout workshop repository
+        uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Provision labs and post CSV to NoSQLReg
+        shell: pwsh
+        env:
+          NOSQLREG_BASE_URL: ${{ secrets.NOSQLREG_BASE_URL || 'https://nosqlreg.azurewebsites.net' }}
+          LAB_PROVISIONING_CALLBACK_TOKEN: ${{ secrets.LAB_PROVISIONING_CALLBACK_TOKEN }}
+          DISPATCH_JOB_ID: ${{ inputs.jobId }}
+          DISPATCH_EVENT_ID: ${{ inputs.eventId }}
+          DISPATCH_STUDENT_COUNT: ${{ inputs.studentCount }}
+          DISPATCH_IS_DOCDB: ${{ inputs.isDocDB }}
+          DISPATCH_LAB_ID: ${{ inputs.labId }}
+          DISPATCH_LOCATION: ${{ inputs.location }}
+          DISPATCH_VM_SIZE: ${{ inputs.vmSize }}
+          DISPATCH_CALLBACK_URL: ${{ inputs.callbackUrl }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          if (-not $env:LAB_PROVISIONING_CALLBACK_TOKEN) {
+            throw 'LAB_PROVISIONING_CALLBACK_TOKEN secret is required.'
+          }
+
+          $jobs = @()
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') {
+            $jobs = @([pscustomobject]@{
+              id = $env:DISPATCH_JOB_ID
+              eventId = $env:DISPATCH_EVENT_ID
+              studentCount = [int]$env:DISPATCH_STUDENT_COUNT
+              isDocDB = [System.Convert]::ToBoolean($env:DISPATCH_IS_DOCDB)
+              labId = $env:DISPATCH_LAB_ID
+              location = $env:DISPATCH_LOCATION
+              vmSize = $env:DISPATCH_VM_SIZE
+              callbackUrl = $env:DISPATCH_CALLBACK_URL
+            })
+          } else {
+            $dueUri = "$($env:NOSQLREG_BASE_URL.TrimEnd('/'))/api/provisioning/jobs/due"
+            $due = Invoke-RestMethod -Method Post -Uri $dueUri -Headers @{ Authorization = "Bearer $env:LAB_PROVISIONING_CALLBACK_TOKEN" }
+            $jobs = @($due.jobs)
+          }
+
+          if (-not $jobs.Count) {
+            Write-Host 'No lab provisioning jobs to process.'
+            return
+          }
+
+          foreach ($job in $jobs) {
+            Write-Host "Provisioning job $($job.id) for event $($job.eventId) with $($job.studentCount) student(s)."
+            $outputDirectory = Join-Path $PWD "out\$($job.id)"
+            New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
+
+            $scriptArgs = @(
+              '-StudentCount', [string]$job.studentCount,
+              '-NoFabric',
+              '-location', [string]$job.location,
+              '-vmSize', [string]$job.vmSize,
+              '-IsDocDB', [string]([bool]$job.isDocDB),
+              '-OutputDirectory', $outputDirectory
+            )
+            if ($job.labId) {
+              $scriptArgs += @('-LabId', [string]$job.labId)
+            }
+
+            & .\script\provision-student-environments.ps1 @scriptArgs
+
+            $csv = Get-ChildItem -Path $outputDirectory -Filter 'students-*.csv' |
+              Sort-Object LastWriteTime -Descending |
+              Select-Object -First 1
+            if (-not $csv) {
+              throw "Provisioning completed but no students CSV was found in $outputDirectory."
+            }
+
+            Write-Host "Posting lab details CSV $($csv.FullName) back to NoSQLReg."
+            Invoke-RestMethod `
+              -Method Post `
+              -Uri ([string]$job.callbackUrl) `
+              -Headers @{ Authorization = "Bearer $env:LAB_PROVISIONING_CALLBACK_TOKEN" } `
+              -Form @{ file = Get-Item $csv.FullName }
+          }

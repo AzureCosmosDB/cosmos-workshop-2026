@@ -63,6 +63,9 @@ param foundryModelName string
 @description('Azure AI Foundry chat model version')
 param foundryModelVersion string
 
+@description('Azure AI Foundry chat model deployment capacity in thousands of tokens per minute')
+param foundryModelCapacity int = 10
+
 @description('Azure AI Foundry embedding model deployment name')
 param foundryEmbeddingDeploymentName string
 
@@ -174,6 +177,7 @@ module foundry './modules/foundry.bicep' = if (deployFoundry) {
     deploymentName: foundryDeploymentName
     modelName: foundryModelName
     modelVersion: foundryModelVersion
+    modelCapacity: foundryModelCapacity
     embeddingDeploymentName: foundryEmbeddingDeploymentName
     embeddingModelName: foundryEmbeddingModelName
     embeddingModelVersion: foundryEmbeddingModelVersion
@@ -224,9 +228,11 @@ module vm './modules/vm.bicep' = {
     diskControllerType: diskControllerType
     adminUsername: vmAdminUsername
     adminPassword: vmAdminPassword
+    entraLoginObjectId: studentOwnerObjectId
     nicId: networking.outputs.nicId
     tags: tags
     applyVmSecurityType: applyVmSecurityType
+    isDocDB: isDocDB
   }
 }
 
