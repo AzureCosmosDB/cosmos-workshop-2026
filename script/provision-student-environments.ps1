@@ -5,6 +5,10 @@ param(
   [int]$StudentCount,
 
   [Parameter(Mandatory = $false)]
+  [ValidateRange(1, 999)]
+  [int]$StartStudentNumber = 1,
+
+  [Parameter(Mandatory = $false)]
   [ValidatePattern('^[a-zA-Z0-9][a-zA-Z0-9-]{0,49}$')]
   [string]$LabId,
 
@@ -234,6 +238,10 @@ if (-not (Test-Path $OutputDirectory)) {
   New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 }
 
+if ($StartStudentNumber -gt $StudentCount) {
+  throw '-StartStudentNumber must be less than or equal to -StudentCount.'
+}
+
 if ($SubscriptionId) {
   az account set --subscription $SubscriptionId --only-show-errors
   Assert-LastAzCommand -FailureMessage "Failed to select subscription '$SubscriptionId'."
@@ -296,7 +304,7 @@ if ($NoFabric) {
 }
 Write-Output ""
 
-for ($batchStart = 1; $batchStart -le $StudentCount; $batchStart += $MaxParallelDeployments) {
+for ($batchStart = $StartStudentNumber; $batchStart -le $StudentCount; $batchStart += $MaxParallelDeployments) {
   $batchEnd = [Math]::Min($batchStart + $MaxParallelDeployments - 1, $StudentCount)
   $pendingDeployments = New-Object System.Collections.Generic.List[object]
 
@@ -311,8 +319,12 @@ for ($batchStart = 1; $batchStart -le $StudentCount; $batchStart += $MaxParallel
   $deploymentName = "lab-dev$studentNumber-$batchId"
   $studentAlias = "lab_user${studentNumber}_${batchId}"
   $studentUpn = "$studentAlias@$tenantDomain"
-  $studentPassword = New-RandomPassword
-  $vmAdminPassword = New-RandomPassword
+  $existingRosterRow = $null
+  if (Test-Path $csvPath) {
+    $existingRosterRow = @((Import-Csv $csvPath) | Where-Object { $_.UserPrincipalName -eq $studentUpn } | Select-Object -First 1)[0]
+  }
+  $studentPassword = if ($existingRosterRow -and $existingRosterRow.TempPassword) { $existingRosterRow.TempPassword } else { New-RandomPassword }
+  $vmAdminPassword = if ($existingRosterRow -and $existingRosterRow.VmAdminPassword) { $existingRosterRow.VmAdminPassword } else { New-RandomPassword }
   # Escape embedded quotes so the JSON survives PowerShell -> az.cmd argv marshaling on Windows.
   # Without this, the inner quotes are stripped and az sees {key:value,...} instead of {"key":"value",...}.
   $tagsJson = @{
@@ -586,6 +598,7 @@ $fabricMembersFile = Join-Path $OutputDirectory "fabric-admins-$batchId-$index.j
   $rowObject.VmPublicFqdn = $outputs.vmPublicIp.value
   $rowObject.BastionName = $outputs.bastionName.value
   $rowObject.BastionUri = $bastionUri
+  $rowObject.VmAdminPassword = $vmAdminPassword
   $rowObject.CosmosServerlessAccount = $outputs.cosmosAccountName.value
   $rowObject.CosmosProvisionedAccount = $outputs.cosmosProvisionedAccountName.value
   $rowObject.DocumentDbCluster = $outputs.documentDbClusterName.value

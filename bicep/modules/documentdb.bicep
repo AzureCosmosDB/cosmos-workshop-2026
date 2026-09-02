@@ -18,6 +18,9 @@ param adminPassword string
 @description('Tags for the DocumentDB cluster.')
 param tags object
 
+@description('Entra object ID for the student to register as an administrative Microsoft Entra ID user on the cluster.')
+param studentOwnerObjectId string = ''
+
 resource cluster 'Microsoft.DocumentDB/mongoClusters@2025-09-01' = {
   name: clusterName
   location: location
@@ -26,6 +29,13 @@ resource cluster 'Microsoft.DocumentDB/mongoClusters@2025-09-01' = {
     administrator: {
       userName: adminUsername
       password: adminPassword
+    }
+    authConfig: {
+      // Native auth stays enabled as a fallback alongside Entra ID.
+      allowedModes: [
+        'MicrosoftEntraID'
+        'NativeAuth'
+      ]
     }
     serverVersion: '8.0'
     sharding: {
@@ -40,6 +50,25 @@ resource cluster 'Microsoft.DocumentDB/mongoClusters@2025-09-01' = {
     compute: {
       tier: 'M30'
     }
+  }
+}
+
+resource studentEntraAdminUser 'Microsoft.DocumentDB/mongoClusters/users@2025-09-01' = if (!empty(studentOwnerObjectId)) {
+  parent: cluster
+  name: studentOwnerObjectId
+  properties: {
+    identityProvider: {
+      type: 'MicrosoftEntraID'
+      properties: {
+        principalType: 'User'
+      }
+    }
+    roles: [
+      {
+        db: 'admin'
+        role: 'root'
+      }
+    ]
   }
 }
 

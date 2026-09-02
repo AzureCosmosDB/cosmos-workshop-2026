@@ -27,7 +27,7 @@ param adminPassword string
 @description('Entra object ID to grant Windows VM sign-in access.')
 param entraLoginObjectId string
 
-var vmUserLoginRoleDefinitionId = 'fb879cbe-42f0-422f-9e78-4cbd5e659c3e'
+var vmUserLoginRoleDefinitionId = 'fb879df8-f326-4884-b1cf-06f3ad86be52'
 
 @description('NIC resource ID to attach to the VM')
 param nicId string
@@ -42,9 +42,6 @@ param applyVmSecurityType bool = true
 param isDocDB bool = false
 
 var vmPropertiesBase = {
-  identity: {
-    type: 'SystemAssigned'
-  }
   hardwareProfile: {
     vmSize: vmSize
   }
@@ -113,6 +110,9 @@ resource virtualMachine 'Microsoft.Compute/virtualMachines@2024-11-01' = {
   name: vmName
   location: location
   tags: tags
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: union(vmPropertiesBase, vmSecurityProfile)
 }
 
@@ -154,9 +154,9 @@ resource initializeLabVm 'Microsoft.Compute/virtualMachines/runCommands@2024-11-
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setupScript -SetupPhase Machine -IsDocDB __IS_DOCDB__
         if ($LASTEXITCODE -ne 0) { throw "Machine setup failed with exit code $LASTEXITCODE." }
 
-        $entraSetupAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$setupScript`" -SetupPhase User -IsDocDB __IS_DOCDB__ -SetupTaskName InitializeEntraUser"
+        $entraSetupAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$setupScript`" -SetupPhase User -IsDocDB __IS_DOCDB__ -SetupTaskName InitializeEntraUser"
         $entraSetupTrigger = New-ScheduledTaskTrigger -AtLogOn
-        $entraSetupPrincipal = New-ScheduledTaskPrincipal -GroupId 'BUILTIN\Users' -LogonType Group -RunLevel Limited
+        $entraSetupPrincipal = New-ScheduledTaskPrincipal -GroupId 'BUILTIN\Users' -RunLevel Limited
         Register-ScheduledTask -TaskName InitializeEntraUser -Action $entraSetupAction -Trigger $entraSetupTrigger -Principal $entraSetupPrincipal -Force | Out-Null
         Unregister-ScheduledTask -TaskName InitializeLabVm -Confirm:$false -ErrorAction SilentlyContinue
       ''', '__INITIALIZER_BASE64__', base64(initializerScript)), '__ADMIN_USERNAME__', adminUsername), '__IS_DOCDB__', string(isDocDB ? 1 : 0))

@@ -161,6 +161,7 @@ module documentDb './modules/documentdb.bicep' = if (isDocDB) {
     adminUsername: vmAdminUsername
     adminPassword: vmAdminPassword
     tags: tags
+    studentOwnerObjectId: studentOwnerObjectId
   }
 }
 

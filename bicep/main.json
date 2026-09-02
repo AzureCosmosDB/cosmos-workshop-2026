@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.44.1.10279",
-      "templateHash": "11556862120780881650"
+      "templateHash": "4984709344409443151"
     }
   },
   "parameters": {
@@ -307,7 +307,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.44.1.10279",
-              "templateHash": "1038127429262816399"
+              "templateHash": "3570640154842132796"
             }
           },
           "parameters": {
@@ -1432,6 +1432,9 @@
                   },
                   "tags": {
                     "value": "[parameters('tags')]"
+                  },
+                  "studentOwnerObjectId": {
+                    "value": "[parameters('studentOwnerObjectId')]"
                   }
                 },
                 "template": {
@@ -1441,7 +1444,7 @@
                     "_generator": {
                       "name": "bicep",
                       "version": "0.44.1.10279",
-                      "templateHash": "18205429395375474470"
+                      "templateHash": "6147742921902502187"
                     }
                   },
                   "parameters": {
@@ -1476,6 +1479,13 @@
                       "metadata": {
                         "description": "Tags for the DocumentDB cluster."
                       }
+                    },
+                    "studentOwnerObjectId": {
+                      "type": "string",
+                      "defaultValue": "",
+                      "metadata": {
+                        "description": "Entra object ID for the student to register as an administrative Microsoft Entra ID user on the cluster."
+                      }
                     }
                   },
                   "resources": [
@@ -1489,6 +1499,12 @@
                         "administrator": {
                           "userName": "[parameters('adminUsername')]",
                           "password": "[parameters('adminPassword')]"
+                        },
+                        "authConfig": {
+                          "allowedModes": [
+                            "MicrosoftEntraID",
+                            "NativeAuth"
+                          ]
                         },
                         "serverVersion": "8.0",
                         "sharding": {
@@ -1504,6 +1520,29 @@
                           "tier": "M30"
                         }
                       }
+                    },
+                    {
+                      "condition": "[not(empty(parameters('studentOwnerObjectId')))]",
+                      "type": "Microsoft.DocumentDB/mongoClusters/users",
+                      "apiVersion": "2025-09-01",
+                      "name": "[format('{0}/{1}', parameters('clusterName'), parameters('studentOwnerObjectId'))]",
+                      "properties": {
+                        "identityProvider": {
+                          "type": "MicrosoftEntraID",
+                          "properties": {
+                            "principalType": "User"
+                          }
+                        },
+                        "roles": [
+                          {
+                            "db": "admin",
+                            "role": "root"
+                          }
+                        ]
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.DocumentDB/mongoClusters', parameters('clusterName'))]"
+                      ]
                     },
                     {
                       "type": "Microsoft.DocumentDB/mongoClusters/firewallRules",
@@ -2329,7 +2368,7 @@
                     "_generator": {
                       "name": "bicep",
                       "version": "0.44.1.10279",
-                      "templateHash": "17910373241858403117"
+                      "templateHash": "1139361770869293081"
                     }
                   },
                   "parameters": {
@@ -2411,11 +2450,8 @@
                     }
                   },
                   "variables": {
-                    "vmUserLoginRoleDefinitionId": "fb879cbe-42f0-422f-9e78-4cbd5e659c3e",
+                    "vmUserLoginRoleDefinitionId": "fb879df8-f326-4884-b1cf-06f3ad86be52",
                     "vmPropertiesBase": {
-                      "identity": {
-                        "type": "SystemAssigned"
-                      },
                       "hardwareProfile": {
                         "vmSize": "[parameters('vmSize')]"
                       },
@@ -2478,6 +2514,9 @@
                       "name": "[parameters('vmName')]",
                       "location": "[parameters('location')]",
                       "tags": "[parameters('tags')]",
+                      "identity": {
+                        "type": "SystemAssigned"
+                      },
                       "properties": "[union(variables('vmPropertiesBase'), variables('vmSecurityProfile'))]"
                     },
                     {
@@ -2517,7 +2556,7 @@
                       "location": "[parameters('location')]",
                       "properties": {
                         "source": {
-                          "script": "[replace(replace(replace('        $ErrorActionPreference = ''Stop''\r\n        $setupRoot = ''C:\\LabSetup''\r\n        $setupScript = Join-Path $setupRoot ''Initialize-LabVm.ps1''\r\n        New-Item -ItemType Directory -Path $setupRoot -Force | Out-Null\r\n        [System.IO.File]::WriteAllBytes($setupScript, [Convert]::FromBase64String(''__INITIALIZER_BASE64__''))\r\n\r\n        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setupScript -SetupPhase Machine -IsDocDB __IS_DOCDB__\r\n        if ($LASTEXITCODE -ne 0) { throw \"Machine setup failed with exit code $LASTEXITCODE.\" }\r\n\r\n        $entraSetupAction = New-ScheduledTaskAction -Execute ''powershell.exe'' -Argument \"-NoProfile -ExecutionPolicy Bypass -File `\"$setupScript`\" -SetupPhase User -IsDocDB __IS_DOCDB__ -SetupTaskName InitializeEntraUser\"\r\n        $entraSetupTrigger = New-ScheduledTaskTrigger -AtLogOn\r\n        $entraSetupPrincipal = New-ScheduledTaskPrincipal -GroupId ''BUILTIN\\Users'' -LogonType Group -RunLevel Limited\r\n        Register-ScheduledTask -TaskName InitializeEntraUser -Action $entraSetupAction -Trigger $entraSetupTrigger -Principal $entraSetupPrincipal -Force | Out-Null\r\n        Unregister-ScheduledTask -TaskName InitializeLabVm -Confirm:$false -ErrorAction SilentlyContinue\r\n      ', '__INITIALIZER_BASE64__', base64(variables('initializerScript'))), '__ADMIN_USERNAME__', parameters('adminUsername')), '__IS_DOCDB__', string(if(parameters('isDocDB'), 1, 0)))]"
+                          "script": "[replace(replace(replace('        $ErrorActionPreference = ''Stop''\r\n        $setupRoot = ''C:\\LabSetup''\r\n        $setupScript = Join-Path $setupRoot ''Initialize-LabVm.ps1''\r\n        New-Item -ItemType Directory -Path $setupRoot -Force | Out-Null\r\n        [System.IO.File]::WriteAllBytes($setupScript, [Convert]::FromBase64String(''__INITIALIZER_BASE64__''))\r\n\r\n        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setupScript -SetupPhase Machine -IsDocDB __IS_DOCDB__\r\n        if ($LASTEXITCODE -ne 0) { throw \"Machine setup failed with exit code $LASTEXITCODE.\" }\r\n\r\n        $entraSetupAction = New-ScheduledTaskAction -Execute ''powershell.exe'' -Argument \"-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `\"$setupScript`\" -SetupPhase User -IsDocDB __IS_DOCDB__ -SetupTaskName InitializeEntraUser\"\r\n        $entraSetupTrigger = New-ScheduledTaskTrigger -AtLogOn\r\n        $entraSetupPrincipal = New-ScheduledTaskPrincipal -GroupId ''BUILTIN\\Users'' -RunLevel Limited\r\n        Register-ScheduledTask -TaskName InitializeEntraUser -Action $entraSetupAction -Trigger $entraSetupTrigger -Principal $entraSetupPrincipal -Force | Out-Null\r\n        Unregister-ScheduledTask -TaskName InitializeLabVm -Confirm:$false -ErrorAction SilentlyContinue\r\n      ', '__INITIALIZER_BASE64__', base64(variables('initializerScript'))), '__ADMIN_USERNAME__', parameters('adminUsername')), '__IS_DOCDB__', string(if(parameters('isDocDB'), 1, 0)))]"
                         },
                         "timeoutInSeconds": 7200,
                         "asyncExecution": false,
