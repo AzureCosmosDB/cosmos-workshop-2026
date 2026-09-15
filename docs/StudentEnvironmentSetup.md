@@ -55,7 +55,7 @@ browser, so you do not need a local RDP client.
 Run:
 
 ```powershell
-az login --use-device-code
+az login
 ```
 
 The terminal prints a short code. In the visible browser window, open
