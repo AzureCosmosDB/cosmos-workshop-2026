@@ -378,6 +378,7 @@ These come up regardless of section.
 
 - [TrainerEnvironmentSetup.md](TrainerEnvironmentSetup.md) — pre-class environment provisioning (Bicep, scripts, roster CSV, smoke-test, cost & cleanup)
 - [StudentEnvironmentSetup.md](StudentEnvironmentSetup.md) — student-facing first-15-minutes walkthrough
+- [ProctorTroubleshootingGuide.md](ProctorTroubleshootingGuide.md) - live student support, common issue resolution, and escalation
 - Azure Cosmos DB Capacity Calculator — <https://cosmos.azure.com/capacitycalculator/>
 - Fabric portal — <https://app.fabric.microsoft.com/>
 - Foundry portal — <https://ai.azure.com>
