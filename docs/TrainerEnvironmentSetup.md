@@ -316,7 +316,7 @@ Start that student's VM first if you provisioned with the default deallocate-aft
 1. Open the student's `BastionUri` in a private browser window without signing in to Azure Portal. Use the student's `UserPrincipalName` and `TempPassword`.
 2. Open PowerShell 7 on the VM. Run:
    ```powershell
-  az login --use-device-code
+  az login
    ```
   Open <https://microsoft.com/devicelogin> in the visible browser window, enter
   the displayed code, and sign in as `lab_user{N}_{batchId}@<tenant>` with the
