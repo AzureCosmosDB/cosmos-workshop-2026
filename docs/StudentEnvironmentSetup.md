@@ -69,9 +69,13 @@ az account show --query "{subscription:name,user:user.name}" --output table
 
 ### Configure workshop environment variables
 
-The repository is already cloned on the VM. Run:
+The repository is already cloned on the VM
+In oder to refresh the clone to the latest version set the environment variables run:
 
 ```powershell
+cd "$HOME\Documents\"
+git clone https://github.com/AzureCosmosDB/cosmos-workshop-2026
+
 cd "$HOME\Documents\cosmos-workshop-2026"
 ./SetEnv.ps1
 ```
