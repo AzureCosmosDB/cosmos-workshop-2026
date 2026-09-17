@@ -30,7 +30,7 @@ The VM deployment runs [`script/Initialize-LabVm.ps1`](../script/Initialize-LabV
 - Clone the workshop repository to `Documents\cosmos-workshop-2026`. _(script)_
 - Use PowerShell 7 for the workshop. Git Bash is not required.
 - Sign in to Windows from the Bastion session with the student's Entra UPN and
-  then use `az login --use-device-code` so the
+  then use `az login` so the
   authentication window cannot be hidden behind VS Code.
 - WSL update popup: press **Enter** to install. (Cancel just re-opens the popup later)
   - WSL itself is not used by any lab but update keeps it from popping back up.
