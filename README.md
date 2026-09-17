@@ -14,6 +14,7 @@ Windows VM in a browser.
 |---------|------------|------------------|
 | Student | [Student workshop guide](docs/StudentEnvironmentSetup.md) | Connect to your VM, configure access, choose C# or Python, and complete the labs in order |
 | Trainer | [Trainer delivery guide](docs/TrainerGuide.md) | Prepare the session, guide the course narrative, deliver each module, and support students |
+| Proctor | [Proctor troubleshooting guide](docs/ProctorTroubleshootingGuide.md) | Resolve common access, VM, authentication, environment, and lab issues during delivery |
 | Environment administrator | [Trainer environment setup](docs/TrainerEnvironmentSetup.md) | Provision the cohort, validate resources, distribute credentials, control costs, and clean up |
 
 ## What the workshop covers
@@ -93,5 +94,6 @@ cells. Lab 4B runs in Microsoft Fabric and therefore has no local code project.
 
 * [Student workshop guide](docs/StudentEnvironmentSetup.md)
 * [Trainer delivery guide](docs/TrainerGuide.md)
+* [Proctor troubleshooting guide](docs/ProctorTroubleshootingGuide.md)
 * [Trainer environment setup](docs/TrainerEnvironmentSetup.md)
 * [Lab VM setup reference](docs/LabVmSetup.md)
