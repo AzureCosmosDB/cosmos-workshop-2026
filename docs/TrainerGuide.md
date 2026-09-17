@@ -27,7 +27,7 @@ covered in [Trainer Environment Setup](TrainerEnvironmentSetup.md).
 
 1. Use one roster row exactly as a student would.
 2. Open its Bastion link and sign in to the VM.
-3. Run `az login --use-device-code`, `SetEnv.ps1`, and
+3. Run `az login`, `SetEnv.ps1`, and
   `1B_Account_Access.ps1`.
 4. Run the smoke test documented in
   [Trainer Environment Setup](TrainerEnvironmentSetup.md#smoke-testing-one-student-environment).
