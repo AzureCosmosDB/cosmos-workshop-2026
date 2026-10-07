@@ -13,6 +13,36 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+function Get-CosmosAccountEndpoint {
+  param(
+    [Parameter(Mandatory = $true)][string]$ResourceGroupName,
+    [Parameter(Mandatory = $true)][psobject]$Account,
+    [Parameter(Mandatory = $false)][ValidateRange(1, 10)][int]$MaxAttempts = 6
+  )
+
+  if (-not [string]::IsNullOrWhiteSpace([string]$Account.documentEndpoint)) {
+    return [string]$Account.documentEndpoint
+  }
+
+  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+    $endpoint = (
+      az cosmosdb show `
+        --resource-group $ResourceGroupName `
+        --name $Account.name `
+        --query documentEndpoint `
+        --output tsv `
+        --only-show-errors
+    ).Trim()
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($endpoint)) {
+      return $endpoint
+    }
+    if ($attempt -lt $MaxAttempts) {
+      Start-Sleep -Seconds 10
+    }
+  }
+  return $null
+}
+
 # ---- Require an active az session ----
 az account show -o none 2>$null
 if ($LASTEXITCODE -ne 0) {
@@ -52,28 +82,46 @@ if (-not $ResourceGroup) {
 
 Write-Output "Using resource group: $ResourceGroup"
 
-# ---- Cosmos DB (serverless + provisioned, distinguished by capability) ----
-$cosmosJson = az cosmosdb list -g $ResourceGroup -o json
-if ($LASTEXITCODE -ne 0) { Write-Error "Failed to list Cosmos accounts in $ResourceGroup."; exit 1 }
-$cosmosAccounts = @($cosmosJson | ConvertFrom-Json)
-
-$COSMOS_ENDPOINT = $null
-$COSMOS_ENDPOINT_PROVISIONED = $null
-foreach ($acct in $cosmosAccounts) {
-  $isServerless = $false
-  if ($acct.capabilities) {
-    $isServerless = [bool]($acct.capabilities | Where-Object {
-      ($_ -is [string] -and $_ -eq 'EnableServerless') -or $_.name -eq 'EnableServerless'
-    })
+# ---- Cosmos DB (serverless + provisioned, distinguished by stable name) ----
+$cosmosAccounts = @()
+for ($attempt = 1; $attempt -le 6; $attempt++) {
+  $cosmosJson = az cosmosdb list -g $ResourceGroup -o json --only-show-errors
+  if ($LASTEXITCODE -eq 0) {
+    $cosmosAccounts = @($cosmosJson | ConvertFrom-Json)
+    if ($cosmosAccounts.Count -ge 2) { break }
   }
-  if ($isServerless -or $acct.name -notlike 'cosmos-provisioned-*') {
-    $COSMOS_ENDPOINT = $acct.documentEndpoint
-  } else {
-    $COSMOS_ENDPOINT_PROVISIONED = $acct.documentEndpoint
+  if ($attempt -lt 6) {
+    Start-Sleep -Seconds 10
   }
 }
-if (-not $COSMOS_ENDPOINT) { Write-Error "No serverless Cosmos account found in $ResourceGroup."; exit 1 }
-if (-not $COSMOS_ENDPOINT_PROVISIONED) { Write-Error "No provisioned Cosmos account found in $ResourceGroup."; exit 1 }
+if ($LASTEXITCODE -ne 0) { Write-Error "Failed to list Cosmos accounts in $ResourceGroup."; exit 1 }
+
+$serverlessAccount = $cosmosAccounts |
+  Where-Object { $_.name -notlike 'cosmos-provisioned-*' } |
+  Select-Object -First 1
+$provisionedAccount = $cosmosAccounts |
+  Where-Object { $_.name -like 'cosmos-provisioned-*' } |
+  Select-Object -First 1
+$discoveredAccountNames = ($cosmosAccounts | ForEach-Object name) -join ', '
+if (-not $serverlessAccount) {
+  Write-Error "No serverless Cosmos account found in $ResourceGroup. Discovered: $discoveredAccountNames"
+  exit 1
+}
+if (-not $provisionedAccount) {
+  Write-Error "No provisioned Cosmos account found in $ResourceGroup. Discovered: $discoveredAccountNames"
+  exit 1
+}
+
+$COSMOS_ENDPOINT = Get-CosmosAccountEndpoint -ResourceGroupName $ResourceGroup -Account $serverlessAccount
+$COSMOS_ENDPOINT_PROVISIONED = Get-CosmosAccountEndpoint -ResourceGroupName $ResourceGroup -Account $provisionedAccount
+if (-not $COSMOS_ENDPOINT) {
+  Write-Error "Serverless Cosmos account '$($serverlessAccount.name)' exists, but its endpoint could not be read."
+  exit 1
+}
+if (-not $COSMOS_ENDPOINT_PROVISIONED) {
+  Write-Error "Provisioned Cosmos account '$($provisionedAccount.name)' exists, but its endpoint could not be read."
+  exit 1
+}
 
 # ---- Azure AI Foundry (single AIServices account hosts both chat and embeddings) ----
 $foundryJson = az cognitiveservices account list -g $ResourceGroup -o json
