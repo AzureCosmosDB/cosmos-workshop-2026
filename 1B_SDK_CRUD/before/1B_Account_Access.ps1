@@ -8,6 +8,17 @@
 
 $ErrorActionPreference = 'Stop'
 
+function ConvertFrom-JsonList {
+  param(
+    [Parameter(Mandatory = $true)][string]$Json
+  )
+
+  $parsed = ConvertFrom-Json -InputObject $Json
+  foreach ($item in $parsed) {
+    $item
+  }
+}
+
 $RESOURCE_GROUP = $env:LAB_RESOURCE_GROUP
 if (-not $RESOURCE_GROUP) {
   $RESOURCE_GROUP = [System.Environment]::GetEnvironmentVariable('LAB_RESOURCE_GROUP', 'User')
@@ -33,7 +44,9 @@ Write-Output "Subscription:           $SUBSCRIPTION_ID"
 Write-Output "Resource group:         $RESOURCE_GROUP"
 
 # ---- Discover account names from the resource group ----
-$cosmosAccounts = @(az cosmosdb list -g $RESOURCE_GROUP -o json | ConvertFrom-Json)
+$cosmosJson = az cosmosdb list -g $RESOURCE_GROUP -o json
+if ($LASTEXITCODE -ne 0) { Write-Error "Failed to list Cosmos accounts in $RESOURCE_GROUP."; exit 1 }
+$cosmosAccounts = @(ConvertFrom-JsonList -Json $cosmosJson)
 $serverless = $cosmosAccounts | Where-Object {
   ($_.capabilities | Where-Object {
     ($_ -is [string] -and $_ -eq 'EnableServerless') -or $_.name -eq 'EnableServerless'

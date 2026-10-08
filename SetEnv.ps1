@@ -13,6 +13,17 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+function ConvertFrom-JsonList {
+  param(
+    [Parameter(Mandatory = $true)][string]$Json
+  )
+
+  $parsed = ConvertFrom-Json -InputObject $Json
+  foreach ($item in $parsed) {
+    $item
+  }
+}
+
 function Get-CosmosAccountEndpoint {
   param(
     [Parameter(Mandatory = $true)][string]$ResourceGroupName,
@@ -58,7 +69,7 @@ if (-not $ResourceGroup) {
     Write-Error "Failed to list resource groups. Pass -ResourceGroup explicitly."
     exit 1
   }
-  $candidates = @($rgListJson | ConvertFrom-Json)
+  $candidates = @(ConvertFrom-JsonList -Json $rgListJson)
 
   if ($candidates.Count -eq 0) {
     Write-Error "No resource groups tagged project=cosmos-labs were found. Pass -ResourceGroup explicitly."
@@ -87,7 +98,7 @@ $cosmosAccounts = @()
 for ($attempt = 1; $attempt -le 6; $attempt++) {
   $cosmosJson = az cosmosdb list -g $ResourceGroup -o json --only-show-errors
   if ($LASTEXITCODE -eq 0) {
-    $cosmosAccounts = @($cosmosJson | ConvertFrom-Json)
+    $cosmosAccounts = @(ConvertFrom-JsonList -Json $cosmosJson)
     if ($cosmosAccounts.Count -ge 2) { break }
   }
   if ($attempt -lt 6) {
@@ -96,21 +107,19 @@ for ($attempt = 1; $attempt -le 6; $attempt++) {
 }
 if ($LASTEXITCODE -ne 0) { Write-Error "Failed to list Cosmos accounts in $ResourceGroup."; exit 1 }
 
-$serverlessAccount = $cosmosAccounts |
-  Where-Object { $_.name -notlike 'cosmos-provisioned-*' } |
-  Select-Object -First 1
-$provisionedAccount = $cosmosAccounts |
-  Where-Object { $_.name -like 'cosmos-provisioned-*' } |
-  Select-Object -First 1
+$serverlessAccounts = @($cosmosAccounts | Where-Object { $_.name -notlike 'cosmos-provisioned-*' })
+$provisionedAccounts = @($cosmosAccounts | Where-Object { $_.name -like 'cosmos-provisioned-*' })
 $discoveredAccountNames = ($cosmosAccounts | ForEach-Object name) -join ', '
-if (-not $serverlessAccount) {
-  Write-Error "No serverless Cosmos account found in $ResourceGroup. Discovered: $discoveredAccountNames"
+if ($serverlessAccounts.Count -ne 1) {
+  Write-Error "Expected one serverless Cosmos account in $ResourceGroup; found $($serverlessAccounts.Count). Discovered: $discoveredAccountNames"
   exit 1
 }
-if (-not $provisionedAccount) {
-  Write-Error "No provisioned Cosmos account found in $ResourceGroup. Discovered: $discoveredAccountNames"
+if ($provisionedAccounts.Count -ne 1) {
+  Write-Error "Expected one provisioned Cosmos account in $ResourceGroup; found $($provisionedAccounts.Count). Discovered: $discoveredAccountNames"
   exit 1
 }
+$serverlessAccount = $serverlessAccounts[0]
+$provisionedAccount = $provisionedAccounts[0]
 
 $COSMOS_ENDPOINT = Get-CosmosAccountEndpoint -ResourceGroupName $ResourceGroup -Account $serverlessAccount
 $COSMOS_ENDPOINT_PROVISIONED = Get-CosmosAccountEndpoint -ResourceGroupName $ResourceGroup -Account $provisionedAccount
@@ -122,11 +131,26 @@ if (-not $COSMOS_ENDPOINT_PROVISIONED) {
   Write-Error "Provisioned Cosmos account '$($provisionedAccount.name)' exists, but its endpoint could not be read."
   exit 1
 }
+if ($COSMOS_ENDPOINT -is [array] -or $COSMOS_ENDPOINT_PROVISIONED -is [array]) {
+  Write-Error "Cosmos endpoint discovery returned multiple values."
+  exit 1
+}
+if (
+  $COSMOS_ENDPOINT -notmatch '^https://[^/\s]+\.documents\.azure\.com:443/$' -or
+  $COSMOS_ENDPOINT_PROVISIONED -notmatch '^https://[^/\s]+\.documents\.azure\.com:443/$'
+) {
+  Write-Error "Cosmos endpoint discovery returned an invalid endpoint."
+  exit 1
+}
+if ($COSMOS_ENDPOINT -eq $COSMOS_ENDPOINT_PROVISIONED) {
+  Write-Error "Serverless and provisioned Cosmos endpoints must be different."
+  exit 1
+}
 
 # ---- Azure AI Foundry (single AIServices account hosts both chat and embeddings) ----
 $foundryJson = az cognitiveservices account list -g $ResourceGroup -o json
 if ($LASTEXITCODE -ne 0) { Write-Error "Failed to list Cognitive Services accounts in $ResourceGroup."; exit 1 }
-$foundry = @($foundryJson | ConvertFrom-Json) | Where-Object { $_.kind -eq 'AIServices' } | Select-Object -First 1
+$foundry = @(ConvertFrom-JsonList -Json $foundryJson) | Where-Object { $_.kind -eq 'AIServices' } | Select-Object -First 1
 if (-not $foundry) { Write-Error "No AIServices (Foundry) account found in $ResourceGroup."; exit 1 }
 $foundryName = $foundry.name
 
@@ -138,7 +162,7 @@ $EMBEDDINGS_ENDPOINT = $foundry.properties.endpoint
 # ---- Model deployment names (the names used in API calls, not raw model names) ----
 $deploymentsJson = az cognitiveservices account deployment list -g $ResourceGroup -n $foundryName -o json
 if ($LASTEXITCODE -ne 0) { Write-Error "Failed to list model deployments for $foundryName."; exit 1 }
-$deployments = @($deploymentsJson | ConvertFrom-Json)
+$deployments = @(ConvertFrom-JsonList -Json $deploymentsJson)
 
 $completion = $deployments | Where-Object { $_.properties.model.name -notmatch 'embedding' } | Select-Object -First 1
 $embedding  = $deployments | Where-Object { $_.properties.model.name -match  'embedding' } | Select-Object -First 1
@@ -146,6 +170,10 @@ if (-not $completion) { Write-Error "No chat completion deployment found on $fou
 if (-not $embedding)  { Write-Error "No embedding deployment found on $foundryName."; exit 1 }
 $COMPLETIONS_MODEL = $completion.name
 $EMBEDDINGS_MODEL  = $embedding.name
+if ($COMPLETIONS_MODEL -match '\s' -or $EMBEDDINGS_MODEL -match '\s') {
+  Write-Error "Model deployment discovery returned multiple values."
+  exit 1
+}
 
 # ---- Set current-process and persist User-scope environment variables ----
 $env:LAB_RESOURCE_GROUP          = $ResourceGroup
