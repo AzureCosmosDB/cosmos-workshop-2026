@@ -82,6 +82,10 @@ var hybridQuery = new QueryDefinition("""
 
 Do not add `FullTextContains` to the `WHERE` clause. Filtering by the keyword first would remove semantic-only candidates before RRF can combine the rankings.
 
+Read the iterator until `HasMoreResults` is false. A hybrid query can return
+empty intermediate pages before the page containing its ranked results, so one
+`ReadNextAsync()` call is not sufficient.
+
 **Expected output**: **Provisioned Throughput** and **Vector Search** rank near the top. The first matches the keyword `throughput`; the second matches the semantic meaning of the query.
 
 ## Lab Complete!

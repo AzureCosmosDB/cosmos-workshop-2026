@@ -208,18 +208,33 @@ public class Steps_Vector_Search
             .WithParameter("@search", keywordText)
             .WithParameter("@emb", queryVector);
 
-        var hybridResults = await Container.GetItemQueryIterator<Dictionary<string, object>>(hybridQuery)
-            .ReadNextAsync()
-            .ConfigureAwait(false);
-
+        using var iterator = Container.GetItemQueryIterator<Dictionary<string, object>>(hybridQuery);
+        var totalResults = 0;
+        double requestCharge = 0;
         Console.WriteLine("Hybrid search results:");
-        foreach (var result in hybridResults)
+        while (iterator.HasMoreResults)
         {
-            Console.WriteLine($"  ID: {result["id"]}");
-            Console.WriteLine($"  Title: {result["title"]}");
-            Console.WriteLine($"  Vector distance: {result.GetValueOrDefault("vectorDistance")}");
-            Console.WriteLine($"  Text: {result["text"]}\n");
+            var response = await iterator.ReadNextAsync().ConfigureAwait(false);
+            requestCharge += response.RequestCharge;
+
+            foreach (var result in response)
+            {
+                totalResults++;
+                Console.WriteLine($"  ID: {result["id"]}");
+                Console.WriteLine($"  Title: {result["title"]}");
+                Console.WriteLine($"  Vector distance: {result.GetValueOrDefault("vectorDistance")}");
+                Console.WriteLine($"  Text: {result["text"]}\n");
+            }
         }
+
+        if (totalResults == 0)
+        {
+            throw new InvalidOperationException(
+                "Hybrid search returned no results after reading all response pages.");
+        }
+
+        Console.WriteLine($"Total hybrid results: {totalResults}");
+        Console.WriteLine($"Request charge: {requestCharge:F2} RU");
     }
     #endregion
 }

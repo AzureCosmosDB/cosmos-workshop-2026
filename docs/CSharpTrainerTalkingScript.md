@@ -421,8 +421,10 @@ students begin coding.
 
 The observed transcript proved that vector and full-text queries returned
 rows. Its `Hybrid search results:` heading had no rows beneath it. Treat that
-as a failed hybrid step, not a successful completion. The correct result must
-contain ranked rows.
+as a failed hybrid step, not a successful completion. The root cause was a
+single `ReadNextAsync()` call. The live query returned page counts `0, 0, 3,
+0`, so the first page was empty even though the full iterator contained three
+ranked rows.
 
 The environment prerequisites are:
 
@@ -836,7 +838,8 @@ Students should see:
 * Both signals represented near the top of the hybrid result
 
 An empty `Hybrid search results:` section is not success. The completed query
-must return rows. Stop and diagnose the environment rather than moving to 2E.
+must read until `HasMoreResults` is false and return rows. A hybrid query can
+produce empty intermediate pages before its ranked results.
 
 ### If a student is blocked
 
@@ -844,9 +847,9 @@ must return rows. Stop and diagnose the environment rather than moving to 2E.
 * No full-text output can mean the account capability, full-text policy, or
   full-text index is missing.
 * Full-text results followed by an empty hybrid result usually means the
-  account capability or RRF index state has not converged. Confirm
-  `EnableNoSQLFullTextSearch`, wait for propagation, restart the process, and
-  rerun the completed lab.
+  code called `ReadNextAsync()` only once. Consume the full iterator first.
+  If the total remains zero, confirm `EnableNoSQLFullTextSearch` and the
+  full-text indexes.
 * A 403 mentioning a public source IP means private DNS is wrong. It is not
   caused by the RRF query.
 * Confirm the query uses partition key `docs`, not `rag`.
