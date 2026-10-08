@@ -325,6 +325,377 @@ Students should observe:
 > We now have operational data and efficient access patterns. The next stage
 > adds model inference and converts text into vectors.
 
+## Foundry onward slide-by-slide run of show
+
+Start at slide 47. Slides 1 through 46 are outside this delivery segment.
+Use the detailed lab sections later in this guide while students are coding.
+
+### Slide 47: Foundry + Cosmos DB for Agents and RAG
+
+> This section connects model inference to operational data. Microsoft Foundry
+> supplies models, agent capabilities, evaluation, and governance. Cosmos DB
+> supplies two distinct data services: durable conversation state and
+> low-latency vector retrieval.
+>
+> Keep those roles separate in your architecture. Thread storage answers,
+> "What happened in this conversation?" Vector storage answers, "Which source
+> passages are most relevant to this question?"
+
+Transition:
+
+> Let us place those responsibilities in the Foundry architecture.
+
+### Slide 48: Microsoft Foundry at a Glance
+
+> Foundry presents agents, models, and tools through one Azure platform.
+> Cosmos DB then anchors the stateful side of the solution. It can persist
+> agent threads and store source text beside its embedding vector for RAG.
+>
+> The key design advantage is operational proximity. The application can
+> update business data, conversation state, and retrieval content through a
+> consistent database platform rather than synchronizing a second vector
+> service for this workshop.
+
+Point out `https://ai.azure.com`, but keep the C# focus on the deployed model
+clients and Cosmos containers rather than navigating every portal blade.
+
+### Slide 49: Foundry Agent Service Setup Modes
+
+> Basic setup is optimized for rapid prototyping with platform-managed
+> storage. Standard setup introduces customer-managed resources. Standard with
+> private networking adds network isolation around those resources.
+>
+> Our workshop environments follow the enterprise principle behind the third
+> option. Database and model endpoints are reached through private endpoints
+> and private DNS. Public network access remains disabled.
+
+If a student receives a 403 that names a public source IP, explain that the
+request resolved or routed publicly. Do not weaken the firewall. Validate
+private DNS and the endpoint instead.
+
+### Slide 50: BYO Thread Storage with Cosmos DB
+
+> Foundry standard setup can provision an `enterprise_memory` database with
+> separate containers for user-visible messages, system messages, and agent
+> entities. That separation gives the customer control over retention,
+> auditing, encryption, and access.
+>
+> Lab 4A teaches the same architectural principle with a workshop-owned
+> `Messages` container. It does not claim that our custom schema is identical
+> to the managed `enterprise_memory` schema. The shared concept is durable,
+> queryable thread state under customer control.
+
+Call out the three managed container responsibilities shown on the slide:
+
+* `thread-message-store` for end-user conversation messages
+* `system-thread-message-store` for internal system messages
+* `agent-entity-store` for instructions, tool definitions, and model inputs or
+  outputs
+
+### Slide 51: Lab 2C, Chat Completions and Embeddings
+
+> We will now call two different model APIs from C#. Chat completion generates
+> tokens. Embedding converts text into a fixed-length numeric representation.
+> The workshop uses a 1,536-dimensional embedding, which must match the Cosmos
+> vector policy exactly.
+
+Observed output to narrate:
+
+* The embedding contained 1,536 dimensions.
+* The sample cosine similarity was `0.3940`.
+* The completion reported 459 completion tokens.
+
+Do not present `0.3940` as 39.4 percent confidence. It is a relative similarity
+signal. Also explain that the 459-token usage must come from SDK telemetry,
+because visible response length is not a reliable billing estimate.
+
+Move to the detailed [Lab 2C](#lab-2c-completions-and-embeddings) section when
+students begin coding.
+
+### Slide 52: Lab 2D, Vector Search
+
+> This lab compares semantic retrieval, lexical retrieval, and hybrid ranking.
+> Vector distance finds related meaning. Full-text search finds lexical
+> relevance. RRF combines the ranked lists without requiring their raw scores
+> to use the same scale.
+
+The observed transcript proved that vector and full-text queries returned
+rows. Its `Hybrid search results:` heading had no rows beneath it. Treat that
+as a failed hybrid step, not a successful completion. The correct result must
+contain ranked rows.
+
+The environment prerequisites are:
+
+* `EnableNoSQLVectorSearch`
+* `EnableNoSQLFullTextSearch`
+* A 1,536-dimension vector policy on `/embedding`
+* A DiskANN vector index
+* Full-text policy and indexes for `/text` and `/title`
+
+Move to the detailed [Lab 2D](#lab-2d-vector-full-text-and-hybrid-search)
+section for the C# query shapes and troubleshooting.
+
+### Slide 53: Retrieval-Augmented Generation
+
+> RAG separates ingestion from inference. During ingestion, we chunk source
+> documents, create an embedding for each chunk, and store text plus vector in
+> Cosmos DB. During inference, we embed the question, retrieve top-K chunks,
+> and pass only that evidence to chat completion.
+>
+> Cosmos DB is both the operational document store and vector store here. The
+> embedding lives in the same item as the source text and metadata, so the
+> retrieved evidence remains attributable.
+
+Draw attention to the quality boundary:
+
+> Generation cannot recover evidence that retrieval failed to return.
+> Retrieval quality therefore places an upper bound on answer quality.
+
+### Slide 54: Security and Governance for Agents
+
+> Agent identity should be first-class. Microsoft Entra ID, RBAC, Conditional
+> Access, and audit logs let us grant the narrowest required permissions
+> without distributing long-lived keys.
+>
+> In these C# labs, `DefaultAzureCredential` obtains Entra tokens. Network
+> isolation and identity authorization solve different problems. Private
+> endpoints control the path. RBAC controls what the caller can do after it
+> arrives.
+
+The workshop does not exercise every governance feature listed on the slide.
+Describe customer-managed keys and agent-specific roles as production design
+options, not completed lab steps.
+
+### Slide 55: Observability and Guardrails
+
+> Observability must cover retrieval and generation. Capture latency, token
+> usage, retrieved document IDs, evaluation scores, and model deployment.
+> OpenTelemetry traces and Azure Monitor then connect those measurements across
+> model, agent, and database calls.
+>
+> Guardrails address a different risk class. Prompt Shields help detect prompt
+> injection, PII controls identify or redact sensitive data, and task-adherence
+> checks detect agent drift.
+
+Connect the slide to observed lab output:
+
+* Lab 2C exposes model usage.
+* Lab 2F produces quality scores.
+* Lab 4A stores latency, token, and retrieval metadata.
+* Lab 4B aggregates those fields analytically.
+
+Do not imply that the workshop implements Prompt Shields or PII redaction. They
+are production follow-on controls.
+
+### Slide 56: Models and Pricing
+
+> Foundry offers first-party and partner model families for text, embeddings,
+> audio, image, and video workloads. The platform surface is not the main cost
+> unit. Deployed models, agent operations, tools, and consumed tokens drive
+> billing.
+>
+> The workshop resolves deployment names from environment variables. In the
+> current environment those names are `gpt5mini` and
+> `textembedding3small`. Code should not hard-code display names from the slide
+> or assume every environment uses the same deployment label.
+
+Use SDK-reported tokens and Cosmos request charges for cost discussion. Do not
+estimate either from visible response length or document count.
+
+### Slide 57: Lab 2E, RAG Pipeline
+
+> This lab implements the complete ingestion and inference path. C# chunks the
+> source, requests embeddings, stores each vectorized item, embeds the question,
+> retrieves the nearest chunks, and supplies them as grounded context.
+
+Observed output to narrate:
+
+* Three vectorized writes cost approximately `73.89`, `67.79`, and `65.89`
+  request units.
+* Each short sample source produced one chunk.
+
+The RU values are expected to be higher than small scalar writes because
+Cosmos DB stores the item and maintains the DiskANN vector index. Treat the
+numbers as observations from this run, not universal constants.
+
+Move to the detailed [Lab 2E](#lab-2e-rag-pipeline) section for chunking,
+retrieval, and prompt-composition guidance.
+
+### Slide 58: Lab 2F, Evaluation of RAG Outputs
+
+> A working pipeline is not automatically a high-quality pipeline. We compare
+> generated answers with expected answers and ask a judge model for a strict
+> score from one to five.
+
+Observed output to narrate:
+
+* The three scores were `5`, `3`, and `5`.
+* The average was `4.33`.
+
+Use the middle score as the teaching moment. The application completed
+successfully, but one answer was weaker. Operational health and answer quality
+are separate release gates.
+
+Move to the detailed [Lab 2F](#lab-2f-rag-evaluation) section for the judge
+prompt contract and parser behavior.
+
+### Slide 59: Model Catalog
+
+> Model selection is an engineering decision across quality, latency, context
+> window, region, deployment type, and price. Start from the workload and its
+> evaluation data rather than choosing only by benchmark rank.
+
+Transition:
+
+> The next two slides separate model families from deployment governance.
+
+### Slide 60: Model Categories and Families
+
+> Azure Direct models are billed through the Azure subscription. Partner or
+> community models can use partner-specific commercial terms. Frontier models
+> target the most complex reasoning and multimodal work. Earlier-generation
+> models can remain the better production choice when latency and cost matter.
+>
+> Embedding models are not chat models. Their vector dimensions and similarity
+> behavior become part of the database schema because the Cosmos vector policy
+> must match them.
+
+The workshop uses an embedding deployment that produces 1,536 dimensions. A
+model change therefore requires validation of both application configuration
+and container policy.
+
+### Slide 61: Catalog vs Foundry Resource
+
+> The catalog is where we discover compatible models and deployment choices.
+> The Foundry resource is the governed Azure boundary where deployments,
+> capacity, networking, identity, and access are controlled.
+>
+> Production code should prefer managed identity and Entra authorization over
+> embedded API keys. That is the authentication pattern used by the C# labs.
+
+Transition:
+
+> We now combine model inference, retrieval, and durable conversation state in
+> one application.
+
+### Slide 62: End-to-End App, Conversational History and Agent Memory
+
+> Lab 4A stores each user and assistant turn as a separate Cosmos item
+> partitioned by `sessionId`. The application retrieves a bounded history
+> window, adds vector-retrieved evidence, calls the model, and stores the
+> response with operational metadata.
+
+Observed behavior to narrate:
+
+* The application creates a new session ID on each run.
+* Recent turns are ordered within one session partition.
+* Vector retrieval returns three hits.
+* The shared `rag` partition can contain documents from Labs 2E and 4A.
+* The printed sample schema is illustrative and its model label can differ
+  from the active deployment.
+
+Ask students to create at least two follow-up turns and then run the lab again
+for a second session. Lab 4B needs enough messages and session diversity to
+produce useful groupings and percentiles.
+
+Move to the detailed [Lab 4A](#lab-4a-chat-memory-and-rag-agent) section for
+the C# history query, prompt composition, and telemetry schema.
+
+### Slide 63: Unify Data Estate
+
+> The application has now produced operational conversation data. The next
+> requirement is analytical: trends across sessions, latency percentiles,
+> token consumption, and source attribution.
+>
+> We should not run those broad scans against the request-serving path.
+> Mirroring separates analytical compute while preserving one authoritative
+> operational source.
+
+### Slide 64: Microsoft Fabric Overview
+
+Open `https://app.fabric.microsoft.com/` and select the prepared workspace, as
+specified in the slide notes.
+
+> Fabric provides the analytical surface. OneLake stores the mirrored data,
+> and notebooks or the SQL analytics endpoint query it without consuming
+> Cosmos DB request units.
+
+Keep the portal tour short. Show the workspace, the mirrored database, and the
+query surface needed for Lab 4B.
+
+### Slide 65: Fabric at a Glance
+
+> Fabric brings multiple analytical workloads onto OneLake. For this workshop,
+> Cosmos DB Mirror is the bridge from operational JSON documents to analytics.
+> It removes the need to build and schedule an ETL copy pipeline.
+
+Clarify that "no RU impact" applies to analytical reads against the mirror.
+The live application continues to consume RUs for operational Cosmos reads and
+writes.
+
+### Slide 66: OneLake and Storage
+
+> OneLake is a tenant-wide logical lake built on ADLS Gen2. The catalog supports
+> discovery and governance, while shortcuts provide zero-copy access patterns
+> to other data locations.
+>
+> In our flow, mirrored Cosmos data becomes available to Fabric workloads
+> through OneLake without changing the C# application's operational endpoint.
+
+### Slide 67: Lakehouse and Warehouse
+
+> Choose compute based on the analytical workload. Lakehouse supports Spark and
+> mixed structured or unstructured data. Warehouse supports T-SQL and
+> dimensional BI patterns. A lakehouse can also expose a SQL analytics
+> endpoint, while Eventhouse serves KQL scenarios.
+
+Lab 4B uses T-SQL against the mirrored data. Remind students not to paste
+Cosmos DB for NoSQL query syntax into the Fabric SQL endpoint.
+
+### Slide 68: Real-Time Hub and Cosmos DB Mirror
+
+> Real-Time Hub addresses data in motion. Cosmos DB Mirror addresses
+> near-real-time replication of operational data into OneLake. Together they
+> support HTAP: transactional work remains in Cosmos DB while analytical work
+> runs in Fabric.
+>
+> There is no custom ETL job in this lab, and the analytical queries do not
+> consume RUs from the operational account.
+
+Show replication state as `Running` before asking students to query.
+
+### Slide 69: End-to-End App, Analyzing History Using Fabric Mirror
+
+> Lab 4B turns the metadata written by Lab 4A into operational insight. We
+> count messages, rank sessions, group activity by hour, calculate latency
+> percentiles, aggregate token usage, and expand retrieved document IDs for
+> source attribution.
+
+Expected proof, after students created enough Lab 4A data:
+
+* Busiest day and message role
+* Most active session
+* p50, p95, and p99 assistant latency
+* Highest-token session
+* Most frequently retrieved source document
+
+There was no completed Lab 4B output in the supplied execution transcript, so
+present these as required validation targets rather than observed results.
+
+Move to the detailed [Lab 4B](#lab-4b-fabric-mirror-analytics) section for the
+T-SQL and JSON extraction patterns.
+
+### Slide 70: Thank you
+
+> We used Cosmos DB first as an operational store, then as a vector store and
+> conversation-memory store. Foundry supplied model inference and evaluation.
+> Fabric mirrored the resulting operational data for analytics without moving
+> those analytical reads onto the live request path.
+>
+> The end-to-end design is one connected system: identity and private
+> networking secure it, retrieval grounds it, evaluation measures it, and
+> telemetry makes it operable.
+
 ## Lab 2C: Completions and Embeddings
 
 ### Say this
@@ -376,6 +747,13 @@ Students should see:
 * A streamed response arriving in chunks
 * Non-zero embedding values
 * Higher similarity for semantically related text
+
+The observed run reported 1,536 dimensions and cosine similarity `0.3940`.
+Treat the similarity as a relative ranking signal, not a confidence percentage.
+The same run reported 459 completion tokens for a short visible answer. Model
+usage can include reasoning and other generated tokens that are not obvious
+from displayed text, so cost analysis should use the SDK usage fields rather
+than estimating from response length.
 
 ### If a student is blocked
 
@@ -457,11 +835,18 @@ Students should see:
 * The Provisioned Throughput document returned by the exact keyword
 * Both signals represented near the top of the hybrid result
 
+An empty `Hybrid search results:` section is not success. The completed query
+must return rows. Stop and diagnose the environment rather than moving to 2E.
+
 ### If a student is blocked
 
 * A vector dimension error means the model output and container policy differ.
 * No full-text output can mean the account capability, full-text policy, or
   full-text index is missing.
+* Full-text results followed by an empty hybrid result usually means the
+  account capability or RRF index state has not converged. Confirm
+  `EnableNoSQLFullTextSearch`, wait for propagation, restart the process, and
+  rerun the completed lab.
 * A 403 mentioning a public source IP means private DNS is wrong. It is not
   caused by the RRF query.
 * Confirm the query uses partition key `docs`, not `rag`.
@@ -523,6 +908,12 @@ The console prints:
 * Three retrieved chunks ordered by similarity
 * An answer grounded in those chunks
 
+In the observed run, the three vectorized writes cost about 66 to 74 RUs each.
+That is a useful live callout: embedding storage also maintains the DiskANN
+index, so ingestion is materially more expensive than storing a small
+non-vector document. Each short source produced one chunk in this sample;
+larger production documents are where chunk-size strategy becomes significant.
+
 ### If a student is blocked
 
 * Empty retrieval usually means Step 2 did not store embeddings in the `rag`
@@ -568,6 +959,11 @@ so a parse failure is intentional evidence that the student step is incomplete.
 
 Students see one valid score per test case and an average mapped to a
 recommendation.
+
+The observed scores were `5`, `3`, and `5`, averaging `4.33`. The middle score
+is the teaching moment. Evaluation found a weaker answer about supported index
+types even though the overall pipeline ran successfully. Operational success
+and answer quality are separate gates.
 
 ### If a student is blocked
 
@@ -628,6 +1024,10 @@ Discuss why:
 * User and assistant turns remain independently queryable
 * Metadata enables latency, token, and retrieval analysis
 
+The schema printed in Step 2 is illustrative. Its sample `metadata.model` value
+can differ from the model deployment shown at startup. The messages generated
+by the live agent should record the actual configured deployment.
+
 ### Proof of success
 
 Students should see:
@@ -638,6 +1038,15 @@ Students should see:
 * Three vector-search hits
 * A grounded answer
 * Follow-up questions that use previous context
+
+Do not exit the interactive loop immediately if Lab 4B follows. Ask at least
+two follow-up questions, then rerun Lab 4A once to create a second session.
+That gives Fabric enough rows and session diversity for grouping, percentile,
+token, and attribution queries.
+
+The `rag` partition is shared by Labs 2E and 4A. Retrieval can therefore show
+chunks seeded by both labs. This is expected and demonstrates why corpus
+versioning, source metadata, and partition strategy matter in production.
 
 ### If a student is blocked
 
