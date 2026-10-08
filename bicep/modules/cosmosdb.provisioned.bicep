@@ -24,6 +24,7 @@ resource dbAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
     disableLocalAuth: true
     capabilities: [
       { name: 'EnableNoSQLVectorSearch' }
+      { name: 'EnableNoSQLFullTextSearch' }
     ]
     consistencyPolicy: {
       defaultConsistencyLevel: 'Session'
