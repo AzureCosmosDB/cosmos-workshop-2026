@@ -15,10 +15,10 @@ $ErrorActionPreference = 'Stop'
 
 function ConvertFrom-JsonList {
   param(
-    [Parameter(Mandatory = $true)][string]$Json
+    [Parameter(Mandatory = $true)][object[]]$Json
   )
 
-  $parsed = ConvertFrom-Json -InputObject $Json
+  $parsed = ConvertFrom-Json -InputObject ($Json -join [Environment]::NewLine)
   foreach ($item in $parsed) {
     $item
   }
