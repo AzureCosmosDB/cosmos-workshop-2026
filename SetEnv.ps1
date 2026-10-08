@@ -147,7 +147,16 @@ if (-not $embedding)  { Write-Error "No embedding deployment found on $foundryNa
 $COMPLETIONS_MODEL = $completion.name
 $EMBEDDINGS_MODEL  = $embedding.name
 
-# ---- Persist as User-scope environment variables ----
+# ---- Set current-process and persist User-scope environment variables ----
+$env:LAB_RESOURCE_GROUP          = $ResourceGroup
+$env:COSMOS_ENDPOINT             = $COSMOS_ENDPOINT
+$env:COSMOS_ENDPOINT_PROVISIONED = $COSMOS_ENDPOINT_PROVISIONED
+$env:FOUNDRY_ENDPOINT            = $FOUNDRY_ENDPOINT
+$env:EMBEDDINGS_ENDPOINT         = $EMBEDDINGS_ENDPOINT
+$env:EMBEDDINGS_KEY              = $null
+$env:COMPLETIONS_MODEL           = $COMPLETIONS_MODEL
+$env:EMBEDDINGS_MODEL            = $EMBEDDINGS_MODEL
+
 [System.Environment]::SetEnvironmentVariable('LAB_RESOURCE_GROUP',         $ResourceGroup,               'User')
 [System.Environment]::SetEnvironmentVariable('COSMOS_ENDPOINT',            $COSMOS_ENDPOINT,             'User')
 [System.Environment]::SetEnvironmentVariable('COSMOS_ENDPOINT_PROVISIONED',$COSMOS_ENDPOINT_PROVISIONED, 'User')
@@ -166,4 +175,4 @@ Write-Output "  FOUNDRY_ENDPOINT            = $FOUNDRY_ENDPOINT"
 Write-Output "  EMBEDDINGS_ENDPOINT         = $EMBEDDINGS_ENDPOINT"
 Write-Output "  COMPLETIONS_MODEL           = $COMPLETIONS_MODEL"
 Write-Output "  EMBEDDINGS_MODEL            = $EMBEDDINGS_MODEL"
-Write-Output "Restart VS Code / your terminal to pick up the new environment variables."
+Write-Output "Environment variables are ready in this terminal and future terminals."

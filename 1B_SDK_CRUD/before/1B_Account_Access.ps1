@@ -10,6 +10,12 @@ $ErrorActionPreference = 'Stop'
 
 $RESOURCE_GROUP = $env:LAB_RESOURCE_GROUP
 if (-not $RESOURCE_GROUP) {
+  $RESOURCE_GROUP = [System.Environment]::GetEnvironmentVariable('LAB_RESOURCE_GROUP', 'User')
+  if ($RESOURCE_GROUP) {
+    $env:LAB_RESOURCE_GROUP = $RESOURCE_GROUP
+  }
+}
+if (-not $RESOURCE_GROUP) {
   Write-Error "LAB_RESOURCE_GROUP is not set. Run ../SetEnv.ps1 first (after 'az login')."
   exit 1
 }
@@ -86,8 +92,10 @@ Write-Output "Cognitive Services OpenAI Contributor role granted on $FOUNDRY_ACC
 # script after recreating an account picks up the new endpoints.
 $endpoint            = "https://$ACCT_NAME.documents.azure.com:443/"
 $endpointProvisioned = "https://$ACCT_NAME_PROVISIONED.documents.azure.com:443/"
+$env:COSMOS_ENDPOINT             = $endpoint
+$env:COSMOS_ENDPOINT_PROVISIONED = $endpointProvisioned
 [System.Environment]::SetEnvironmentVariable('COSMOS_ENDPOINT',                 $endpoint,             'User')
 [System.Environment]::SetEnvironmentVariable('COSMOS_ENDPOINT_PROVISIONED',     $endpointProvisioned,  'User')
 
 Write-Output ""
-Write-Output "Done. Restart VS Code / your terminal so the SDK picks up the env vars."
+Write-Output "Done. Cosmos endpoints are ready in this terminal and future terminals."
