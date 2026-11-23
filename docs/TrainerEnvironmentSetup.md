@@ -7,7 +7,7 @@
 3. [Prerequisites](#environment-setup-prerequisites)
 4. [Shared Fabric setup (batch mode, one-time)](#shared-fabric-setup-batch-mode-one-time)
 5. [Running the provisioning script](#running-the-provisioning-script)
-6. [Automated Deployment via GitHub Actions](#automated-deployment-via-github-actions)
+6. [Scheduled workshop environments](#scheduled-workshop-environments)
 7. [Configuring per-student Fabric workspaces (batch mode)](#configuring-per-student-fabric-workspaces-batch-mode)
 8. [Expected results](#expected-results)
 9. [Handing out credentials](#handing-out-credentials)
@@ -172,31 +172,9 @@ Each batch is timestamped (`yyyyMMddHHmm`); re-runs produce a new `batchId` and 
 
 ---
 
-## Automated Deployment via GitHub Actions
+## Scheduled workshop environments
 
-Two workflows mirror the two-call model: [deploy-lab.yml](../.github/workflows/deploy-lab.yml) creates the environments with VMs deallocated, and [start-lab-vms.yml](../.github/workflows/start-lab-vms.yml) starts them for a given lab identifier when class day arrives.
-
-### One-time setup
-
-1. Register a Microsoft Entra app (or reuse one) and add a federated credential trusting this repository for GitHub Actions OIDC.
-2. Grant that app's service principal, at the subscription scope: **Contributor**, **User Access Administrator**, and the Microsoft Graph **User.ReadWrite.All** application permission (or an equivalent **User Administrator** directory role) so it can create Entra users the same way an interactive trainer sign-in does.
-3. In the repository, create a `lab-provisioning` environment and add these secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`. Consider adding required reviewers on this environment since both workflows create or start billable resources.
-4. Set these repository variables for the scheduled path: `CLASS_DATE` (the class date, `yyyy-MM-dd`, set per cohort), and optionally `DEFAULT_STUDENT_COUNT`, `DEFAULT_FABRIC_MODE` (`none`, `shared`, or `per-student`), `DEFAULT_LOCATION`, `DEFAULT_TENANT_DOMAIN`.
-
-### Deploying (deploy-lab.yml)
-
-* On demand: trigger the workflow manually and set the student count, Fabric mode, location, and optional `lab_id`. Leave `lab_id` blank to let the script generate one, or set it to reuse an existing batch.
-* Scheduled: the workflow runs daily and only proceeds when tomorrow's date matches `vars.CLASS_DATE`, so provisioning fires automatically about a day ahead of class without adjusting the cron expression each cohort.
-* The run's log and job summary print the effective lab identifier (`::notice::Lab ID for this batch is ...`), whether generated or reused. Use it with the start workflow below.
-* VMs are deallocated as soon as each deployment finishes, so the environments are ready but not billed for compute until started.
-
-### Starting VMs for class (start-lab-vms.yml)
-
-Trigger this workflow manually with the `lab_id` from the deploy run (or any lab identifier you provisioned with `-LabId`). It starts every VM tagged with that batch, regardless of which deploy run created them, so multiple provisioning runs against the same `lab_id` are started together.
-
-### Handling the roster
-
-The roster CSV is uploaded as a workflow artifact named `student-roster-<run-id>` with a 3-day retention window. It contains temporary passwords, so download it over an authenticated GitHub session, distribute credentials over a secure channel, and delete the artifact once handed out.
+This repository doesn't include automation that signs in to Azure. To prepare a scheduled workshop, sign in with your own account and run [provision-student-environments.ps1](../script/provision-student-environments.ps1) at least a day before class, then run [Set-LabVmPowerState.ps1](../script/Set-LabVmPowerState.ps1) on class day, as described in [Running the provisioning script](#running-the-provisioning-script).
 
 ---
 
